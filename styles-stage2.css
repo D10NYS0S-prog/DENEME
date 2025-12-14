@@ -774,6 +774,73 @@ textarea.form-control {
     margin-bottom: 10px;
 }
 
+/* Special Courts Styling */
+.special-court-modal h3 {
+    margin-bottom: 10px;
+    color: var(--text-primary);
+}
+
+.daire-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.daire-card {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: var(--white);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.daire-card:hover {
+    border-color: var(--primary-color);
+    background: rgba(102, 126, 234, 0.05);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+}
+
+.daire-icon {
+    font-size: 28px;
+    min-width: 40px;
+    text-align: center;
+}
+
+.daire-info {
+    flex: 1;
+}
+
+.daire-info strong {
+    color: var(--text-primary);
+    font-size: 15px;
+}
+
+.daire-info p {
+    margin-top: 4px;
+    font-size: 12px;
+}
+
+.daire-arrow {
+    font-size: 20px;
+    color: var(--text-secondary);
+}
+
+.special-court-files h4 {
+    margin-bottom: 10px;
+    color: var(--text-primary);
+}
+
+.files-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
     width: 8px;

@@ -669,18 +669,348 @@ window.syncNotesToTasks = async function() {
 // ============================================================================
 
 window.openYargitay = async function() {
-    showToast('Yargıtay modülü yükleniyor...', 'info');
-    // TODO: Implement Yargitay UI
+    showToast('Yargıtay daireleri yükleniyor...', 'info');
+    
+    try {
+        // Fetch chambers list
+        const daireler = await uyapApi.getYargitayDaireleri();
+        
+        if (daireler.error) {
+            showToast('Yargıtay daireleri alınamadı: ' + daireler.error, 'error');
+            return;
+        }
+        
+        // Create modal content
+        const modalHtml = `
+            <div class="special-court-modal" id="yargitayModal">
+                <h3>⚖️ Yargıtay Daireleri</h3>
+                <p class="text-muted">Bir daire seçerek dosyaları görüntüleyin</p>
+                <div class="daire-list">
+                    ${Array.isArray(daireler) ? daireler.map(daire => `
+                        <div class="daire-card" onclick="loadYargitayFiles('${daire.id || daire.daire}', '${daire.adi || daire.ad}')">
+                            <div class="daire-icon">⚖️</div>
+                            <div class="daire-info">
+                                <strong>${daire.adi || daire.ad || 'Daire ' + (daire.id || daire.daire)}</strong>
+                                ${daire.aciklama ? `<p class="text-muted">${daire.aciklama}</p>` : ''}
+                            </div>
+                            <div class="daire-arrow">→</div>
+                        </div>
+                    `).join('') : '<p class="text-center text-muted">Daire bulunamadı</p>'}
+                </div>
+            </div>
+        `;
+        
+        // Show in settings modal (reuse modal)
+        const modal = document.getElementById('settingsModal');
+        const modalBody = modal.querySelector('.modal-body');
+        const modalTitle = modal.querySelector('.modal-header h3');
+        
+        modalTitle.textContent = '⚖️ Yargıtay';
+        modalBody.innerHTML = modalHtml;
+        openModal('settingsModal');
+        
+    } catch (error) {
+        showToast('Yargıtay modülü hatası: ' + error.message, 'error');
+    }
+};
+
+window.loadYargitayFiles = async function(daireId, daireAdi) {
+    showToast(`${daireAdi} dosyaları yükleniyor...`, 'info');
+    
+    try {
+        const dosyalar = await uyapApi.getYargitayDosyalar(daireId);
+        
+        if (dosyalar.error) {
+            showToast('Dosyalar alınamadı: ' + dosyalar.error, 'error');
+            return;
+        }
+        
+        const filesHtml = `
+            <div class="special-court-files">
+                <div style="margin-bottom: 15px;">
+                    <button class="btn-secondary" onclick="openYargitay()">← Dairelere Dön</button>
+                </div>
+                <h4>${daireAdi} - Dosyalar</h4>
+                <p class="text-muted">Toplam ${Array.isArray(dosyalar) ? dosyalar.length : 0} dosya</p>
+                <div class="files-list" style="max-height: 400px; overflow-y: auto;">
+                    ${Array.isArray(dosyalar) && dosyalar.length > 0 ? dosyalar.map(dosya => `
+                        <div class="file-card" onclick="showYargitayFileDetails('${dosya.dosyaId}', '${dosya.dosyaNo || 'N/A'}')">
+                            <div class="file-number">${dosya.dosyaNo || dosya.esasNo || 'N/A'}</div>
+                            <div class="file-detail-item"><strong>Karar No:</strong> ${dosya.kararNo || 'Yok'}</div>
+                            ${dosya.ilkIncelemeTarih ? `<div class="file-detail-item">📅 ${dosya.ilkIncelemeTarih}</div>` : ''}
+                        </div>
+                    `).join('') : '<p class="text-center text-muted">Dosya bulunamadı</p>'}
+                </div>
+            </div>
+        `;
+        
+        const modal = document.getElementById('settingsModal');
+        const modalBody = modal.querySelector('.modal-body');
+        modalBody.innerHTML = filesHtml;
+        
+    } catch (error) {
+        showToast('Dosyalar yüklenemedi: ' + error.message, 'error');
+    }
+};
+
+window.showYargitayFileDetails = async function(dosyaId, dosyaNo) {
+    showToast('Dosya detayları yükleniyor...', 'info');
+    
+    try {
+        const detay = await uyapApi.getYargitayDosyaDetay(dosyaId);
+        
+        if (detay.error) {
+            showToast('Detay alınamadı: ' + detay.error, 'error');
+            return;
+        }
+        
+        alert(`Yargıtay Dosya Detayı:\n\nDosya No: ${dosyaNo}\nDosya ID: ${dosyaId}\n\n${JSON.stringify(detay, null, 2)}`);
+        // TODO: Create better detail view
+        
+    } catch (error) {
+        showToast('Detay yüklenemedi: ' + error.message, 'error');
+    }
 };
 
 window.openDanistay = async function() {
-    showToast('Danıştay modülü yükleniyor...', 'info');
-    // TODO: Implement Danistay UI
+    showToast('Danıştay daireleri yükleniyor...', 'info');
+    
+    try {
+        const daireler = await uyapApi.getDanistayDaireleri();
+        
+        if (daireler.error) {
+            showToast('Danıştay daireleri alınamadı: ' + daireler.error, 'error');
+            return;
+        }
+        
+        const modalHtml = `
+            <div class="special-court-modal" id="danistayModal">
+                <h3>🏛️ Danıştay Daireleri</h3>
+                <p class="text-muted">Bir daire seçerek dosyaları görüntüleyin</p>
+                <div class="daire-list">
+                    ${Array.isArray(daireler) ? daireler.map(daire => `
+                        <div class="daire-card" onclick="loadDanistayFiles('${daire.id || daire.daire}', '${daire.adi || daire.ad}')">
+                            <div class="daire-icon">🏛️</div>
+                            <div class="daire-info">
+                                <strong>${daire.adi || daire.ad || 'Daire ' + (daire.id || daire.daire)}</strong>
+                                ${daire.aciklama ? `<p class="text-muted">${daire.aciklama}</p>` : ''}
+                            </div>
+                            <div class="daire-arrow">→</div>
+                        </div>
+                    `).join('') : '<p class="text-center text-muted">Daire bulunamadı</p>'}
+                </div>
+            </div>
+        `;
+        
+        const modal = document.getElementById('settingsModal');
+        const modalBody = modal.querySelector('.modal-body');
+        const modalTitle = modal.querySelector('.modal-header h3');
+        
+        modalTitle.textContent = '🏛️ Danıştay';
+        modalBody.innerHTML = modalHtml;
+        openModal('settingsModal');
+        
+    } catch (error) {
+        showToast('Danıştay modülü hatası: ' + error.message, 'error');
+    }
+};
+
+window.loadDanistayFiles = async function(daireId, daireAdi) {
+    showToast(`${daireAdi} dosyaları yükleniyor...`, 'info');
+    
+    try {
+        const dosyalar = await uyapApi.getDanistayDosyalar(daireId);
+        
+        if (dosyalar.error) {
+            showToast('Dosyalar alınamadı: ' + dosyalar.error, 'error');
+            return;
+        }
+        
+        const filesHtml = `
+            <div class="special-court-files">
+                <div style="margin-bottom: 15px;">
+                    <button class="btn-secondary" onclick="openDanistay()">← Dairelere Dön</button>
+                </div>
+                <h4>${daireAdi} - Dosyalar</h4>
+                <p class="text-muted">Toplam ${Array.isArray(dosyalar) ? dosyalar.length : 0} dosya</p>
+                <div class="files-list" style="max-height: 400px; overflow-y: auto;">
+                    ${Array.isArray(dosyalar) && dosyalar.length > 0 ? dosyalar.map(dosya => `
+                        <div class="file-card" onclick="showDanistayFileDetails('${dosya.dosyaId}', '${dosya.dosyaNo || 'N/A'}')">
+                            <div class="file-number">${dosya.dosyaNo || dosya.esasNo || 'N/A'}</div>
+                            <div class="file-detail-item"><strong>Karar No:</strong> ${dosya.kararNo || 'Yok'}</div>
+                            ${dosya.ilkIncelemeTarih ? `<div class="file-detail-item">📅 ${dosya.ilkIncelemeTarih}</div>` : ''}
+                        </div>
+                    `).join('') : '<p class="text-center text-muted">Dosya bulunamadı</p>'}
+                </div>
+            </div>
+        `;
+        
+        const modal = document.getElementById('settingsModal');
+        const modalBody = modal.querySelector('.modal-body');
+        modalBody.innerHTML = filesHtml;
+        
+    } catch (error) {
+        showToast('Dosyalar yüklenemedi: ' + error.message, 'error');
+    }
+};
+
+window.showDanistayFileDetails = async function(dosyaId, dosyaNo) {
+    showToast('Dosya detayları yükleniyor...', 'info');
+    
+    try {
+        const detay = await uyapApi.getDanistayDosyaDetay(dosyaId);
+        
+        if (detay.error) {
+            showToast('Detay alınamadı: ' + detay.error, 'error');
+            return;
+        }
+        
+        alert(`Danıştay Dosya Detayı:\n\nDosya No: ${dosyaNo}\nDosya ID: ${dosyaId}\n\n${JSON.stringify(detay, null, 2)}`);
+        // TODO: Create better detail view
+        
+    } catch (error) {
+        showToast('Detay yüklenemedi: ' + error.message, 'error');
+    }
 };
 
 window.openCBS = async function() {
-    showToast('CBS modülü yükleniyor...', 'info');
-    // TODO: Implement CBS UI
+    showToast('CBS illeri yükleniyor...', 'info');
+    
+    try {
+        const iller = await uyapApi.getIller();
+        
+        if (iller.error) {
+            showToast('İller alınamadı: ' + iller.error, 'error');
+            return;
+        }
+        
+        const modalHtml = `
+            <div class="special-court-modal" id="cbsModal">
+                <h3>📋 CBS İlleri</h3>
+                <p class="text-muted">Bir il seçerek CBS birimlerini görüntüleyin</p>
+                <div class="search-container" style="margin-bottom: 15px;">
+                    <input type="text" id="ilSearchInput" class="search-input" placeholder="İl ara...">
+                </div>
+                <div class="daire-list" id="ilList" style="max-height: 400px; overflow-y: auto;">
+                    ${Array.isArray(iller) ? iller.map(il => `
+                        <div class="daire-card il-card" data-il-name="${(il.adi || il.ad || '').toLowerCase()}" onclick="loadCbsBirimler('${il.kodu || il.kod}', '${il.adi || il.ad}')">
+                            <div class="daire-icon">📍</div>
+                            <div class="daire-info">
+                                <strong>${il.adi || il.ad || 'İl ' + (il.kodu || il.kod)}</strong>
+                            </div>
+                            <div class="daire-arrow">→</div>
+                        </div>
+                    `).join('') : '<p class="text-center text-muted">İl bulunamadı</p>'}
+                </div>
+            </div>
+        `;
+        
+        const modal = document.getElementById('settingsModal');
+        const modalBody = modal.querySelector('.modal-body');
+        const modalTitle = modal.querySelector('.modal-header h3');
+        
+        modalTitle.textContent = '📋 CBS';
+        modalBody.innerHTML = modalHtml;
+        openModal('settingsModal');
+        
+        // Add search functionality
+        setTimeout(() => {
+            const searchInput = document.getElementById('ilSearchInput');
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    const query = e.target.value.toLowerCase();
+                    const ilCards = document.querySelectorAll('.il-card');
+                    ilCards.forEach(card => {
+                        const ilName = card.dataset.ilName || '';
+                        card.style.display = ilName.includes(query) ? 'flex' : 'none';
+                    });
+                });
+            }
+        }, 100);
+        
+    } catch (error) {
+        showToast('CBS modülü hatası: ' + error.message, 'error');
+    }
+};
+
+window.loadCbsBirimler = async function(ilKodu, ilAdi) {
+    showToast(`${ilAdi} CBS birimleri yükleniyor...`, 'info');
+    
+    try {
+        const birimler = await uyapApi.getCbsBirimler(ilKodu);
+        
+        if (birimler.error) {
+            showToast('Birimler alınamadı: ' + birimler.error, 'error');
+            return;
+        }
+        
+        const birimlHtml = `
+            <div class="special-court-files">
+                <div style="margin-bottom: 15px;">
+                    <button class="btn-secondary" onclick="openCBS()">← İllere Dön</button>
+                </div>
+                <h4>${ilAdi} - CBS Birimleri</h4>
+                <p class="text-muted">Toplam ${Array.isArray(birimler) ? birimler.length : 0} birim</p>
+                <div class="daire-list">
+                    ${Array.isArray(birimler) && birimler.length > 0 ? birimler.map(birim => `
+                        <div class="daire-card" onclick="loadCbsFiles('${birim.id || birim.birimId}', '${birim.adi || birim.ad}')">
+                            <div class="daire-icon">📋</div>
+                            <div class="daire-info">
+                                <strong>${birim.adi || birim.ad || 'Birim ' + (birim.id || birim.birimId)}</strong>
+                            </div>
+                            <div class="daire-arrow">→</div>
+                        </div>
+                    `).join('') : '<p class="text-center text-muted">Birim bulunamadı</p>'}
+                </div>
+            </div>
+        `;
+        
+        const modal = document.getElementById('settingsModal');
+        const modalBody = modal.querySelector('.modal-body');
+        modalBody.innerHTML = birimlHtml;
+        
+    } catch (error) {
+        showToast('Birimler yüklenemedi: ' + error.message, 'error');
+    }
+};
+
+window.loadCbsFiles = async function(birimId, birimAdi) {
+    showToast(`${birimAdi} dosyaları yükleniyor...`, 'info');
+    
+    try {
+        const dosyalar = await uyapApi.getCbsDosyalar(birimId);
+        
+        if (dosyalar.error) {
+            showToast('Dosyalar alınamadı: ' + dosyalar.error, 'error');
+            return;
+        }
+        
+        const filesHtml = `
+            <div class="special-court-files">
+                <div style="margin-bottom: 15px;">
+                    <button class="btn-secondary" onclick="loadCbsBirimler('${birimId}', 'İl')">← Birimlere Dön</button>
+                </div>
+                <h4>${birimAdi} - Dosyalar</h4>
+                <p class="text-muted">Toplam ${Array.isArray(dosyalar) ? dosyalar.length : 0} dosya</p>
+                <div class="files-list" style="max-height: 400px; overflow-y: auto;">
+                    ${Array.isArray(dosyalar) && dosyalar.length > 0 ? dosyalar.map(dosya => `
+                        <div class="file-card">
+                            <div class="file-number">${dosya.dosyaNo || dosya.esasNo || 'N/A'}</div>
+                            <div class="file-detail-item"><strong>Birim:</strong> ${dosya.birimAdi || 'N/A'}</div>
+                            ${dosya.durum ? `<div class="file-status">${dosya.durum}</div>` : ''}
+                        </div>
+                    `).join('') : '<p class="text-center text-muted">Dosya bulunamadı</p>'}
+                </div>
+            </div>
+        `;
+        
+        const modal = document.getElementById('settingsModal');
+        const modalBody = modal.querySelector('.modal-body');
+        modalBody.innerHTML = filesHtml;
+        
+    } catch (error) {
+        showToast('Dosyalar yüklenemedi: ' + error.message, 'error');
+    }
 };
 
 // ============================================================================
