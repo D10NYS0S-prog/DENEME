@@ -71,15 +71,15 @@ class UYAPApi {
         console.log('🔄 Session verisi yakalanıyor...');
 
         const sessionScript = `
-            (() => {
+            (function() {
                 // Tüm olası session kaynaklarını kontrol et
-                const jsessionidMatch = document.cookie.match(/JSESSIONID=([^;]+)/);
-                const uyapSessionMatch = document.cookie.match(/UYAP_SESSION=([^;]+)/);
-                const birimIdInput = document.querySelector('input[name="birimId"][type="hidden"]');
-                const kullaniciIdInput = document.querySelector('input[name="kullaniciId"][type="hidden"]');
-                const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+                var jsessionidMatch = document.cookie.match(/JSESSIONID=([^;]+)/);
+                var uyapSessionMatch = document.cookie.match(/UYAP_SESSION=([^;]+)/);
+                var birimIdInput = document.querySelector('input[name="birimId"][type="hidden"]');
+                var kullaniciIdInput = document.querySelector('input[name="kullaniciId"][type="hidden"]');
+                var csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
                 
-                const session = {
+                var session = {
                     // 1. Cookie'ler
                     cookies: document.cookie,
                     jsessionid: jsessionidMatch ? jsessionidMatch[1] : null,
