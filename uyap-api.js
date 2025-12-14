@@ -73,11 +73,17 @@ class UYAPApi {
         const sessionScript = `
             (() => {
                 // Tüm olası session kaynaklarını kontrol et
+                const jsessionidMatch = document.cookie.match(/JSESSIONID=([^;]+)/);
+                const uyapSessionMatch = document.cookie.match(/UYAP_SESSION=([^;]+)/);
+                const birimIdInput = document.querySelector('input[name="birimId"][type="hidden"]');
+                const kullaniciIdInput = document.querySelector('input[name="kullaniciId"][type="hidden"]');
+                const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+                
                 const session = {
                     // 1. Cookie'ler
                     cookies: document.cookie,
-                    jsessionid: document.cookie.match(/JSESSIONID=([^;]+)/)?.[1],
-                    uyapSession: document.cookie.match(/UYAP_SESSION=([^;]+)/)?.[1],
+                    jsessionid: jsessionidMatch ? jsessionidMatch[1] : null,
+                    uyapSession: uyapSessionMatch ? uyapSessionMatch[1] : null,
                     
                     // 2. LocalStorage
                     birimId: localStorage.getItem('birimId') || 
@@ -92,11 +98,11 @@ class UYAPApi {
                     sessionKullaniciId: sessionStorage.getItem('kullaniciId'),
                     
                     // 4. DOM'dan (hidden inputs)
-                    hiddenBirimId: document.querySelector('input[name="birimId"][type="hidden"]')?.value,
-                    hiddenKullaniciId: document.querySelector('input[name="kullaniciId"][type="hidden"]')?.value,
+                    hiddenBirimId: birimIdInput ? birimIdInput.value : null,
+                    hiddenKullaniciId: kullaniciIdInput ? kullaniciIdInput.value : null,
                     
                     // 5. Meta tag'ler
-                    csrfToken: document.querySelector('meta[name="csrf-token"]')?.content,
+                    csrfToken: csrfTokenMeta ? csrfTokenMeta.content : null,
                     
                     timestamp: new Date().toISOString()
                 };
@@ -1796,7 +1802,14 @@ class UYAPApi {
                     }
                     
                     const blob = await response.blob();
-                    const filename = response.headers.get('content-disposition')?.split('filename=')[1]?.replace(/['"]/g, '') || 'evrak.udf';
+                    const contentDisposition = response.headers.get('content-disposition');
+                    let filename = 'evrak.udf';
+                    if (contentDisposition) {
+                        const filenamePart = contentDisposition.split('filename=')[1];
+                        if (filenamePart) {
+                            filename = filenamePart.replace(/['"]/g, '');
+                        }
+                    }
                     
                     return await new Promise((resolve) => {
                         const reader = new FileReader();
