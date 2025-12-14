@@ -1,0 +1,1 @@
+C:\Users\Ahmet Hakan UYSAL\.gemini\antigravity\scratch\uyap-desktop\traffic.log:19:{"timestamp":"2025-12-13T21:47:49.172Z","url":"https://avukatbeta.uyap.gov.tr/dosya_taraf_bilgileri_brd.ajx","data":[{"adi":"HALÝL ÝBRAHÝM ÞÝMÞEK","rol":"Davalý","kisiKurum":"Kiþi"},{"adi":"MERVE ACER","rol":"Davacý","vekil":"[AHMET HAKAN UYSAL]","kisiKurum":"Kiþi"}]}

@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UYAP Desktop</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            overflow: hidden;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 15px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+
+        header h1 {
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #toggle-sidebar {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        #toggle-sidebar:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        #controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        #main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        #sidebar {
+            width: 280px;
+            background: #f8f9fa;
+            border-right: 1px solid #dee2e6;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            transition: all 0.3s;
+        }
+
+        #sidebar.collapsed {
+            width: 60px;
+        }
+
+        #sidebar.collapsed .text {
+            display: none;
+        }
+
+        #sidebar.collapsed .stats-mini {
+            grid-template-columns: 1fr;
+        }
+
+        #sidebar.collapsed .stat-mini .label {
+            display: none;
+        }
+
+        #sidebar.collapsed .action-btn {
+            padding: 10px;
+            text-align: center;
+        }
+
+        #sidebar-header {
+            padding: 15px;
+            background: white;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        #sidebar-header h2 {
+            font-size: 15px;
+            color: #333;
+            margin-bottom: 12px;
+        }
+
+        .stats-mini {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .stat-mini {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-mini .number {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .stat-mini .label {
+            font-size: 10px;
+            opacity: 0.9;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .action-btn {
+            padding: 8px 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .action-btn:hover {
+            background: #5568d3;
+            transform: translateY(-1px);
+        }
+
+        .action-btn .icon {
+            font-size: 16px;
+        }
+
+        #file-list {
+            flex: 1;
+            padding: 12px;
+        }
+
+        .file-item {
+            background: white;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            border-left: 3px solid #667eea;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .file-item:hover {
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            transform: translateX(3px);
+        }
+
+        .file-item.new {
+            border-left-color: #ff6b6b;
+            background: #fff5f5;
+        }
+
+        .file-item h4 {
+            font-size: 13px;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .file-item p {
+            font-size: 11px;
+            color: #666;
+            margin: 2px 0;
+        }
+
+        .file-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            background: #ff6b6b;
+            color: white;
+            border-radius: 8px;
+            font-size: 10px;
+            margin-left: 6px;
+        }
+
+        #browser-container {
+            flex: 1;
+            background: #f5f5f5;
+            position: relative;
+        }
+
+        webview {
+            width: 100%;
+            height: 100%;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 15px;
+            color: #999;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <header>
+            <h1>
+                <button id="toggle-sidebar">☰</button>
+                <span class="text">🏛️ UYAP Yönetim Sistemi</span>
+            </h1>
+            <div id="controls">
+                <button class="btn" id="webview-devtools-btn">🔧 DevTools</button>
+                <button class="btn" id="refresh-btn">🔄</button>
+                <button class="btn" id="back-btn">←</button>
+                <button class="btn" id="forward-btn">→</button>
+            </div>
+        </header>
+
+        <div id="main-container">
+            <div id="sidebar">
+                <div id="sidebar-header">
+                    <h2 class="text">📊 Özet</h2>
+                    <div class="stats-mini">
+                        <div class="stat-mini">
+                            <div class="number" id="total-files">0</div>
+                            <div class="label">Dosya</div>
+                        </div>
+                        <div class="stat-mini">
+                            <div class="number" id="new-docs">0</div>
+                            <div class="label">Yeni</div>
+                        </div>
+                        <div class="stat-mini">
+                            <div class="number" id="total-notif">0</div>
+                            <div class="label">Tebligat</div>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="action-btn" id="sync-btn">
+                            <span class="icon">🔄</span>
+                            <span class="text">Senkronize Et</span>
+                        </button>
+                        <button class="action-btn" id="download-all-btn">
+                            <span class="icon">📥</span>
+                            <span class="text">Tümünü İndir</span>
+                        </button>
+                        <button class="action-btn" id="check-tebligat-btn">
+                            <span class="icon">📮</span>
+                            <span class="text">Tebligat Sorgula</span>
+                        </button>
+                        <button class="action-btn" id="create-udf-btn">
+                            <span class="icon">📝</span>
+                            <span class="text">UDF Oluştur</span>
+                        </button>
+                        <button class="action-btn" id="analyze-dom-btn" style="background: #ff6b6b;">
+                            <span class="icon">🔍</span>
+                            <span class="text">UYAP Analiz Et</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="file-list">
+                    <p class="loading">UYAP'a giriş yapın...</p>
+                </div>
+            </div>
+
+            <div id="browser-container">
+                <webview id="uyap-browser" src="https://avukatbeta.uyap.gov.tr/" partition="persist:uyap"></webview>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const webview = document.getElementById('uyap-browser');
+        const sidebar = document.getElementById('sidebar');
+        const toggleBtn = document.getElementById('toggle-sidebar');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const backBtn = document.getElementById('back-btn');
+        const forwardBtn = document.getElementById('forward-btn');
+        const syncBtn = document.getElementById('sync-btn');
+        const downloadAllBtn = document.getElementById('download-all-btn');
+        const checkTebligatBtn = document.getElementById('check-tebligat-btn');
+        const createUdfBtn = document.getElementById('create-udf-btn');
+        const analyzeDomBtn = document.getElementById('analyze-dom-btn');
+        const fileList = document.getElementById('file-list');
+
+        // Sidebar toggle
+        toggleBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+        });
+
+        // Webview DevTools Aç
+        const webviewDevToolsBtn = document.getElementById('webview-devtools-btn');
+        webviewDevToolsBtn.addEventListener('click', () => {
+            webview.openDevTools();
+        });
+
+        // Browser kontrolleri
+        refreshBtn.addEventListener('click', () => {
+            webview.reload();
+        });
+
+        backBtn.addEventListener('click', () => {
+            if (webview.canGoBack()) {
+                webview.goBack();
+            }
+        });
+
+        forwardBtn.addEventListener('click', () => {
+            if (webview.canGoForward()) {
+                webview.goForward();
+            }
+        });
+
+        // Senkronize Et - GERÇEK UYAP verisi
+        syncBtn.addEventListener('click', async () => {
+            syncBtn.disabled = true;
+            syncBtn.innerHTML = '<span class="icon">⏳</span><span class="text">Yükleniyor...</span>';
+
+            try {
+                const dosyalar = await webview.executeJavaScript(`
+            (function() {
+                const rows = document.querySelectorAll('.dx-datagrid tr[role="row"]');
+                const dosyalar = [];
+                
+rows.forEach((row, index) => {
+    const cells = row.querySelectorAll('td');
+    if (cells.length >= 3) {
+        const data = Array.from(cells).map(c => c.textContent.trim());
+        
+        // Başlık satırını ve taraf listesini atla
+        const isBaslik = data[0] === 'Birim' || data[1] === 'Dosya No' || data[0] === 'Rol';
+        const isTaraf = data[0] === 'Mağdur' || data[0] === 'Sanık' || data[0] === 'Davacı' || data[0] === 'Davalı';
+        const isDosya = data[2] && (data[2].includes('Dava Dosyası') || data[2].includes('İcra Dosyası'));
+        
+        if (!isBaslik && !isTaraf && isDosya) {
+            dosyalar.push({
+                id: index + 1,
+                mahkeme: data[0] || '',
+                dosyaNo: data[1] || '',
+                taraflar: data[2] || '',
+                yeniEvrakSay
+                taraflar: data[2] || '',
+                yeniEvrakSayisi: 0
+            });
+        }
+    }
+});
+                });
+                return dosyalar;
+            })()
+        `);
+
+                if (dosyalar && dosyalar.length > 0) {
+                    displayFiles(dosyalar);
+                    updateStats(dosyalar);
+                } else {
+                    alert('Dosya bulunamadı.');
+                }
+            } catch (error) {
+                alert('Hata: ' + error.message);
+            }
+
+            syncBtn.disabled = false;
+            syncBtn.innerHTML = '<span class="icon">🔄</span><span class="text">Senkronize Et</span>';
+        });
+
+        // Tümünü İndir
+        downloadAllBtn.addEventListener('click', () => {
+            alert('Toplu indirme özelliği yakında eklenecek!');
+        });
+
+        // Tebligat Sorgula
+        checkTebligatBtn.addEventListener('click', () => {
+            alert('Tebligat sorgulama özelliği yakında eklenecek!');
+        });
+
+        // UDF Oluştur
+        createUdfBtn.addEventListener('click', () => {
+            alert('UDF dilekçe oluşturma özelliği yakında eklenecek!');
+        });
+
+        // DOM Analiz - UYAP sayfasını analiz et
+        analyzeDomBtn.addEventListener('click', async () => {
+            analyzeDomBtn.disabled = true;
+            analyzeDomBtn.innerHTML = '<span class="icon">⏳</span><span class="text">Analiz ediliyor...</span>';
+
+            try {
+                console.log('=== UYAP DOM ANALİZİ BAŞLADI ===');
+
+                // 1. Sayfa URL'sini al
+                const url = await webview.executeJavaScript('window.location.href');
+                console.log('📍 Sayfa URL:', url);
+
+                // 2. Sayfa başlığını al
+                const title = await webview.executeJavaScript('document.title');
+                console.log('📄 Sayfa Başlığı:', title);
+
+                // 3. Tüm tabloları bul
+                const tables = await webview.executeJavaScript(`
+                    Array.from(document.querySelectorAll('table')).map((table, i) => ({
+                        index: i,
+                        className: table.className,
+                        id: table.id,
+                        rowCount: table.rows.length,
+                        preview: table.outerHTML.substring(0, 200)
+                    }))
+                `);
+                console.log('📊 Tablolar:', tables);
+
+                // 4. Tüm linkleri bul
+                const links = await webview.executeJavaScript(`
+                    Array.from(document.querySelectorAll('a')).slice(0, 20).map(a => ({
+                        text: a.textContent.trim(),
+                        href: a.href,
+                        className: a.className
+                    }))
+                `);
+                console.log('🔗 İlk 20 Link:', links);
+
+                // 5. Muhtemel dosya listesi elementlerini bul
+                const possibleFileElements = await webview.executeJavaScript(`
+                    const elements = [];
+                    
+                    // Tablo satırlarını kontrol et
+                    document.querySelectorAll('tr').forEach((tr, i) => {
+                        if (i < 10 && (tr.textContent.includes('2024') || tr.textContent.includes('2023'))) {
+                            elements.push({
+                                type: 'table-row',
+                                html: tr.outerHTML.substring(0, 300),
+                                text: tr.textContent.trim().substring(0, 200),
+                                className: tr.className
+                            });
+                        }
+                    });
+                    
+                    // Div'leri kontrol et
+                    document.querySelectorAll('div[class*="dosya"], div[class*="file"], div[class*="list"]').forEach((div, i) => {
+                        if (i < 5) {
+                            elements.push({
+                                type: 'div',
+                                html: div.outerHTML.substring(0, 300),
+                                text: div.textContent.trim().substring(0, 200),
+                                className: div.className
+                            });
+                        }
+                    });
+                    
+                    return elements;
+                `);
+                console.log('📁 Muhtemel Dosya Elementleri:', possibleFileElements);
+
+                // 6. Tüm class isimlerini topla
+                const allClasses = await webview.executeJavaScript(`
+                    const classes = new Set();
+                    document.querySelectorAll('[class]').forEach(el => {
+                        el.className.split(' ').forEach(c => c && classes.add(c));
+                    });
+                    return Array.from(classes).sort();
+                `);
+                console.log('🎨 Tüm CSS Class İsimleri:', allClasses);
+
+                console.log('=== ANALİZ TAMAMLANDI ===');
+                console.log('💡 Konsolu (F12) açıp yukarıdaki bilgileri inceleyin!');
+
+                alert('✅ UYAP sayfası analiz edildi!\n\nKonsolu (F12) açıp sonuçları inceleyin.\n\nÖzellikle "Muhtemel Dosya Elementleri" kısmına bakın.');
+
+            } catch (error) {
+                console.error('❌ Analiz hatası:', error);
+                alert('Analiz sırasında hata oluştu: ' + error.message);
+            }
+
+            analyzeDomBtn.disabled = false;
+            analyzeDomBtn.innerHTML = '<span class="icon">🔍</span><span class="text">UYAP Analiz Et</span>';
+        });
+
+        // Dosyaları göster
+        function displayFiles(dosyalar) {
+            if (!dosyalar || dosyalar.length === 0) {
+                fileList.innerHTML = '<p class="loading">Henüz dosya bulunmuyor.</p>';
+                return;
+            }
+
+            fileList.innerHTML = '';
+            dosyalar.forEach(dosya => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                if (dosya.yeniEvrakSayisi > 0) fileItem.classList.add('new');
+
+                fileItem.innerHTML = `
+                    <h4>
+                        ${dosya.mahkeme}
+                        ${dosya.yeniEvrakSayisi > 0 ? `<span class="file-badge">${dosya.yeniEvrakSayisi} yeni</span>` : ''}
+                    </h4>
+                    <p><strong>Dosya No:</strong> ${dosya.dosyaNo}</p>
+                    <p><strong>Taraflar:</strong> ${dosya.taraflar || 'Bilgi yok'}</p>
+                `;
+
+                fileList.appendChild(fileItem);
+            });
+        }
+
+        // İstatistikleri güncelle
+        function updateStats(dosyalar) {
+            document.getElementById('total-files').textContent = dosyalar.length;
+            document.getElementById('new-docs').textContent = dosyalar.reduce((sum, d) => sum + (d.yeniEvrakSayisi || 0), 0);
+        }
+
+        // Webview yüklendiğinde
+        webview.addEventListener('did-finish-load', () => {
+            console.log('UYAP sayfası yüklendi');
+        });
+
+        console.log('UYAP Desktop UI yüklendi');
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,137 @@
+const { app, BrowserWindow, ipcMain } = require('electron');
+const path = require('path');
+
+// Hot reload - geliştirme için (HATA KAYNAĞI OLABİLİR - GEÇİCİ OLARAK KAPATILDI)
+/*
+try {
+    require('electron-reload')(__dirname, {
+        electron: path.join(__dirname, 'node_modules', '.bin', 'electron')
+    });
+} catch (err) {
+    console.log('Electron-reload yok, normal mod');
+}
+*/
+
+// Hataları yakala
+const fs = require('fs');
+process.on('uncaughtException', (error) => {
+    const errorMsg = `CRASH: ${error.stack}\n`;
+    fs.appendFileSync('crash.txt', errorMsg);
+    console.error(errorMsg);
+});
+
+let mainWindow;
+
+function createWindow() {
+    mainWindow = new BrowserWindow({
+        width: 1400,
+        height: 900,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            webviewTag: true,
+            webSecurity: false,
+            preload: path.join(__dirname, 'preload.js')
+        }
+    });
+
+    // HTML dosyasını yükle
+    mainWindow.loadFile('index.html');
+
+    // DevTools'u aç
+    mainWindow.webContents.openDevTools();
+
+    mainWindow.on('closed', () => {
+        mainWindow = null;
+    });
+}
+
+// Uygulama hazır olduğunda pencereyi oluştur
+app.whenReady().then(() => {
+    createWindow();
+
+    app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+            createWindow();
+        }
+    });
+});
+
+// Tüm pencereler kapatıldığında uygulamayı kapat (macOS hariç)
+app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+        app.quit();
+    }
+});
+
+// IPC Handlers - Frontend ile Backend iletişimi
+
+// UYAP Login
+ipcMain.handle('uyap:login', async (event, credentials) => {
+    try {
+        const UYAPAutomation = require('./backend/uyap-automation');
+        const uyap = new UYAPAutomation();
+        const result = await uyap.login(credentials.username, credentials.password);
+        return { success: true, data: result };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// Dosya listesi çek
+ipcMain.handle('uyap:getDosyaList', async (event) => {
+    try {
+        const UYAPAutomation = require('./backend/uyap-automation');
+        const uyap = new UYAPAutomation();
+        const dosyalar = await uyap.getDosyaList();
+        return { success: true, data: dosyalar };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// Evrak listesi çek
+ipcMain.handle('uyap:getEvrakList', async (event, dosyaId) => {
+    try {
+        const UYAPAutomation = require('./backend/uyap-automation');
+        const uyap = new UYAPAutomation();
+        const evraklar = await uyap.getEvrakList(dosyaId);
+        return { success: true, data: evraklar };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// Evrak indir
+ipcMain.handle('uyap:downloadEvrak', async (event, evrakData) => {
+    try {
+        const FileManager = require('./backend/file-manager');
+        const fileManager = new FileManager();
+        const result = await fileManager.downloadFile(evrakData);
+        return { success: true, data: result };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// Veritabanı işlemleri
+ipcMain.handle('db:query', async (event, query) => {
+    try {
+        const Database = require('./backend/database');
+        const db = new Database();
+        const result = await db.query(query);
+        return { success: true, data: result };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// Webview'dan gelen UYAP verilerini karşıla ve ana pencereye ilet
+ipcMain.on('uyap-data', (event, data) => {
+    // console.log('Main Process: UYAP verisi alındı, Renderer\'a iletiliyor...');
+    if (mainWindow) {
+        mainWindow.webContents.send('uyap-data-captured', data);
+    }
+});
+
+console.log('UYAP Desktop Uygulaması başlatıldı...');

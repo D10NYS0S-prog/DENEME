@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>UYAP Desktop</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            overflow: hidden;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            font-size: 18px;
+        }
+
+        .btn {
+            padding: 8px 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        #main {
+            display: flex;
+            flex: 1;
+        }
+
+        #sidebar {
+            width: 300px;
+            background: #f5f5f5;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .action-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .action-btn:hover {
+            background: #5568d3;
+        }
+
+        #browser-container {
+            flex: 1;
+        }
+
+        webview {
+            width: 100%;
+            height: 100%;
+        }
+
+        .file-item {
+            background: white;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 3px solid #667eea;
+        }
+
+        .file-item h4 {
+            font-size: 13px;
+            margin-bottom: 5px;
+        }
+
+        .file-item p {
+            font-size: 11px;
+            color: #666;
+        }
+
+        #json-input-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #json-input-modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 600px;
+            max-width: 90%;
+        }
+
+        .modal-content h3 {
+            margin-bottom: 15px;
+        }
+
+        .modal-content textarea {
+            width: 100%;
+            height: 200px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .modal-buttons {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .modal-btn.primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .modal-btn.secondary {
+            background: #ddd;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <header>
+            <h1>🏛️ UYAP Desktop</h1>
+            <div>
+                <button class="btn" id="devtools-btn">🔧 DevTools</button>
+                <button class="btn" id="refresh-btn">🔄 Yenile</button>
+                <button class="btn" id="manual-sync-btn" style="background:orange;">🧪 Test Verisi</button>
+            </div>
+        </header>
+
+        <div id="main">
+            <div id="sidebar">
+                <h3>📊 İşlemler</h3>
+                <button class="action-btn" id="auto-fetch-btn" style="background:#28a745; margin-bottom:10px;">🤖
+                    Dosyaları Otomatik Çek</button>
+                <button class="action-btn" id="manual-json-btn" style="background:#6c757d; font-size:0.8em;">📋 JSON
+                    Yapıştır (Yedek)</button>
+                <div id="file-list"></div>
+            </div>
+
+            <div id="browser-container">
+                <webview id="uyap-browser" src="https://avukatbeta.uyap.gov.tr/" partition="persist:uyap"></webview>
+            </div>
+        </div>
+    </div>
+
+    <!-- Docs Modal -->
+    <div id="docs-modal"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:2000; align-items:center; justify-content:center;">
+        <div class="modal-content" style="width: 800px; height: 80%; display: flex; flex-direction: column;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                <h3>📄 Evrak Listesi</h3>
+                <button onclick="document.getElementById('docs-modal').style.display='none'" class="btn"
+                    style="background:red;">Kapat</button>
+            </div>
+            <div id="docs-list" style="flex:1; overflow-y:auto; border:1px solid #ddd; padding:10px;">
+                Yükleniyor...
+            </div>
+        </div>
+    </div>
+
+    <!-- JSON Input Modal -->
+    <div id="json-input-modal">
+        <div class="modal-content">
+            <h3>📋 JSON Verisi Yapıştırın</h3>
+            <p style="font-size: 12px; color: #666; margin-bottom: 10px;">
+                Console'dan kopyaladığınız JSON verisini buraya yapıştırın:
+            </p>
+            <textarea id="json-textarea" placeholder='[{"mahkeme":"...","dosyaNo":"...","taraflar":"..."}]'></textarea>
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" id="cancel-btn">İptal</button>
+                <button class="modal-btn primary" id="load-btn">Yükle</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const webview = document.getElementById('uyap-browser');
+        const syncBtn = document.getElementById('sync-btn'); // Removed/Renamed
+        const devtoolsBtn = document.getElementById('devtools-btn');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const fileList = document.getElementById('file-list');
+        const modal = document.getElementById('json-input-modal');
+        const jsonTextarea = document.getElementById('json-textarea');
+        const loadBtn = document.getElementById('load-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+
+        // DevTools
+        devtoolsBtn.addEventListener('click', () => webview.openDevTools());
+
+        // Yenile
+        refreshBtn.addEventListener('click', () => webview.reload());
+
+        // Senkronize Et - Modal aç
+        syncBtn.addEventListener('click', () => {
+            modal.classList.add('active');
+            jsonTextarea.focus();
+        });
+
+        // İptal
+        cancelBtn.addEventListener('click', () => {
+            modal.classList.remove('active');
+            jsonTextarea.value = '';
+        });
+
+        const { ipcRenderer } = require('electron');
+
+        console.log('✅ UYAP Desktop Pro yüklendi');
+
+        // Otomatik Veri Dinleme
+        ipcRenderer.on('uyap-data-captured', (event, packet) => {
+            console.log("Renderer: Veri Paketi Geldi", packet);
+
+            let items = [];
+            if (Array.isArray(packet)) {
+                items = packet;
+            } else if (packet.data) {
+                if (Array.isArray(packet.data)) {
+                    items = packet.data;
+                } else if (packet.data.data && Array.isArray(packet.data.data)) {
+                    // { data: { data: [...] } } wrapper
+                    items = packet.data.data;
+                } else if (Array.isArray(packet.data.data)) {
+                    // { data: [...] } wrapper
+                    items = packet.data.data;
+                } else {
+                    // Try to finding any array property in packet.data
+                    const keys = Object.keys(packet.data);
+                    for (const key of keys) {
+                        if (Array.isArray(packet.data[key])) {
+                            items = packet.data[key];
+                            console.log(`Found array in property: ${key}`);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Nested array check (search_phrase often returns [ [row1, row2...] ])
+            if (items.length > 0 && Array.isArray(items[0])) {
+                items = items[0];
+            }
+
+            console.log(`Parsed ${items.length} items from packet.`);
+
+
+            if (items.length > 0) {
+                const container = document.getElementById('file-list');
+                // Konteyneri SIFIRLAMIYORUZ, ekleme yapıyoruz. Tekrarları önlemek için kontrol et.
+                // container.innerHTML = ''; 
+
+                items.forEach(item => {
+                    // FIELD MAPPING LOGIC
+                    // UYAP responses vary wildly. Match common patterns.
+                    const dosyaId = item.dosyaId || item.dosyaId_tam || item.id || item.hash;
+                    const dosyaNo = item.dosyaNo || item.text || item.esasNo || 'Numara Yok';
+                    const dosyaDurum = item.dosyaDurum || item.durumAdi || item.durum || 'Durum Yok';
+                    const birimAdi = item.birimAdi || item.birim || item.mahkeme || '-';
+                    const dosyaTur = item.dosyaTur || item.dosyaTuru || item.tur || '-';
+
+                    if (!dosyaId) return; // Skip invalid items
+
+                    // Basit bir tekrar kontrolü (dosyaNo varsa güncelleme de yapılabilir)
+                    const existingCard = Array.from(container.children).find(c => c.innerText.includes(dosyaNo));
+                    if (existingCard) return;
+
+                    const card = document.createElement('div');
+                    card.className = 'file-card';
+                    // Data attribute olarak ID'yi sakla, taraf eşleştirmesi için
+                    card.dataset.dosyaId = dosyaId;
+
+                    card.innerHTML = `
+                         <div class="file-header">
+                             <div class="file-number">${dosyaNo}</div>
+                             <div class="file-status">${dosyaDurum}</div>
+                         </div>
+                         <div class="file-details">
+                             <div class="file-detail-item">
+                                 <strong>Birim:</strong> ${birimAdi}
+                             </div>
+                             <div class="file-detail-item">
+                                 <strong>Tür:</strong> ${dosyaTur}
+                             </div>
+                              <div class="file-detail-item parties-container">
+                                 <strong>Taraflar:</strong> 
+                                 <span class="parties-content">
+                                    <button class="fetch-parties-btn" style="cursor:pointer; padding:2px 6px; font-size:0.8em;" onclick="window.triggerFetch('${dosyaId}')">👥 Getir</button>
+                                 </span>
+                             </div>
+                             <div style="margin-top:5px; text-align:right;">
+                                <button class="btn" style="background:#28a745; font-size:0.8em; padding:4px 8px;" onclick="window.triggerFetchDocs('${dosyaId}')">📄 Evraklar</button>
+                             </div>
+                         </div>
+                     `;
+                    container.appendChild(card);
+                });
+
+                // İstatistikleri güncelle
+                updateStats();
+            }
+        });
+
+        // Taraf Çekme Tetikleyicisi
+        window.triggerFetch = function (dosyaId) {
+            const webview = document.getElementById('uyap-browser');
+            console.log("Requesting parties for:", dosyaId);
+
+            // Loading göster
+            const card = document.querySelector(`.file-card[data-dosya-id="${dosyaId}"]`);
+            if (card) {
+                const btn = card.querySelector('.fetch-parties-btn');
+                if (btn) {
+                    btn.innerHTML = '⏳ Bekleniyor...';
+                    btn.disabled = true;
+                }
+            }
+
+            webview.executeJavaScript(`window.fetchPartyData('${dosyaId}')`);
+        };
+
+        ipcRenderer.on('uyap-party-data-captured', (event, packet) => {
+            console.log("Renderer: Taraf Verisi Geldi", packet);
+            // packet.url içinde dosyaId olabilir mi? 
+            // Veya packet.data içinde.
+            // Genellikle packet.data bir array listesidir: [{kisiKurum: "...", ad: "...", soyad: "...", tarafSifat: "..."}]
+
+            const parties = Array.isArray(packet.data) ? packet.data : (packet.data.data || []);
+
+            if (parties.length > 0) {
+                const names = parties
+                    .filter(p => p.ad || p.soyad || p.kisiKurumAdi) // Boş kayıtları ele
+                    .map(p => {
+                        // FIX: UYAP sends 'adi' (Full Name) or 'kisiKurumAdi' (Institutions)
+                        const name = p.adi || (p.ad && p.soyad ? `${p.ad} ${p.soyad}` : null) || p.kisiKurumAdi || 'İsimsiz';
+                        const role = p.tarafSifat || p.sifat || '';
+                        return `<div style="margin-top:2px;">• <b>${role}:</b> ${name}</div>`;
+                    }).join('');
+
+                // Eğer URL'den ID çıkarabilirsek harika olur. Şimdilik son eklenen veya aktif karta ekleyelim.
+                // VEYA tüm kartlarda "Bekleniyor" olanlardan birine ekleyelim (Bu riskli).
+                // EN DOĞRUSU: Kullanıcı o an hangi detaydaysa o dosya o'dur.
+                // Biz şimdilik "Bekleniyor" yazan İLK karta basalım (Geçici çözüm)
+                // VEYA UI'da "Son Taraf Verisi" diye ayrı bir yere basalım.
+
+                // İYİLEŞTİRME: URL'den dosyaId'yi parse et
+                let matchId = null;
+                try {
+                    // url: ...?dosyaId=...&...
+                    // Relative URL gelirse diye dummy base ekliyoruz
+                    const urlObj = new URL(packet.url, 'http://dummy.com');
+                    matchId = urlObj.searchParams.get("dosyaId");
+                } catch (e) {
+                    console.warn('URL parsing error:', e);
+                }
+
+                let targetCard = null;
+                if (matchId) {
+                    targetCard = document.querySelector(`.file-card[data-dosya-id="${matchId}"]`);
+                }
+
+                if (!targetCard) {
+                    // Eşleşme bulunamadıysa, "Bekleniyor" yazan ilk karta yaz (Varsayım)
+                    targetCard = document.querySelector('.parties-loading')?.closest('.file-card');
+                }
+
+                if (targetCard) {
+                    const container = targetCard.querySelector('.parties-container');
+                    container.innerHTML = `<strong>Taraflar:</strong><br>${names}`;
+                }
+            }
+        });
+        const docsModal = document.getElementById('docs-modal');
+        const docsListDiv = document.getElementById('docs-list');
+
+        // ... variable definitions ...
+
+        // Evrak Çekme Tetikleyicisi
+        window.triggerFetchDocs = function (dosyaId) {
+            const webview = document.getElementById('uyap-browser');
+            console.log("Requesting docs for:", dosyaId);
+
+            docsModal.style.display = 'flex';
+            docsListDiv.innerHTML = '<div style="text-align:center; padding:20px;">⏳ Evraklar Getiriliyor...</div>';
+
+            webview.executeJavaScript(`window.fetchDocuments('${dosyaId}')`);
+        };
+
+        // Evrak İndirme Tetikleyicisi
+        window.triggerDownloadDoc = function (evrakId) {
+            alert('⚠️ İndirme özelliği stabilite çalışması nedeniyle geçici olarak devre dışıdır.\nEvrak ID: ' + evrakId);
+            // Reverting to manual implementation later.
+        };
+
+        ipcRenderer.on('uyap-docs-data-captured', (event, packet) => {
+            console.log("Renderer: Evrak Verisi Geldi", packet);
+            // Verify data structure. usually { evraklar: [...] } or just array
+            const docs = Array.isArray(packet.data) ? packet.data : (packet.data.evraklar || []);
+
+            docsListDiv.innerHTML = '';
+
+            if (docs.length === 0) {
+                docsListDiv.innerHTML = '<div style="padding:10px;">Evrak bulunamadı.</div>';
+                return;
+            }
+
+            const ul = document.createElement('ul');
+            ul.style.listStyle = 'none';
+            ul.style.padding = '0';
+
+            docs.forEach(doc => {
+                const li = document.createElement('li');
+                li.style.cssText = 'padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;';
+
+                const dateStr = doc.sistemeGonderildigiTarih ? new Date(doc.sistemeGonderildigiTarih).toLocaleDateString() : '';
+                const name = doc.evrakTur || doc.tur || 'Evrak';
+                const id = doc.evrakId || doc.id;
+
+                li.innerHTML = `
+                    <div>
+                        <div style="font-weight:bold;">${name}</div>
+                        <div style="font-size:0.85em; color:#666;">${dateStr} - ${doc.aciklama || ''}</div>
+                    </div>
+                    <button class="btn" style="background:#6c757d; font-size:0.8em; padding:5px 10px; cursor:not-allowed;" onclick="triggerDownloadDoc('${id}')" title="Geçici Olarak Devre Dışı">⬇️ İndir (Bakımda)</button>
+                 `;
+                ul.appendChild(li);
+            });
+            docsListDiv.appendChild(ul);
+        });
+
+        // OTOMATİK ÇEKME BUTONU (Artık Ana Buton)
+        const autoFetchBtn = document.getElementById('auto-fetch-btn');
+        autoFetchBtn.addEventListener('click', () => {
+            alert('✅ Buton tıklandı! IPC gönderiliyor...');
+            console.log('Robot başlatılıyor...');
+            autoFetchBtn.innerText = '🤖 Çalışıyor... (Lütfen Bekleyin)';
+            autoFetchBtn.disabled = true;
+            logToDiagnostics('🤖 Otomatik çekme başlatıldı...');
+            ipcRenderer.send('start-automation');
+
+            // 5 saniye sonra butonu sıfırla
+            setTimeout(() => {
+                autoFetchBtn.innerText = '🤖 Dosyaları Otomatik Çek';
+                autoFetchBtn.disabled = false;
+            }, 5000);
+        });
+
+        // MANUEL JSON TEXTAREA (Yedek)
+        const manualJsonBtn = document.getElementById('manual-json-btn');
+        manualJsonBtn.addEventListener('click', () => {
+            modal.classList.add('active');
+            jsonTextarea.focus();
+        });
+
+        // Manuel Test Butonu
+        document.getElementById('manual-sync-btn').addEventListener('click', () => {
+            // Sahte veri ile test et
+            const fakeData = [
+                { mahkeme: 'Test Mahkemesi', dosyaNo: '2024/123', taraflar: 'Ahmet vs Mehmet' },
+                { mahkeme: 'İcra Dairesi', dosyaNo: '2023/999', taraflar: 'Şirket A.Ş.' }
+            ];
+
+            // Direkt UI fonksiyonunu çalıştırıyormuş gibi yap
+            ipcRenderer.emit('uyap-data-captured', {}, { data: fakeData });
+            alert('🧪 Test verisi gönderildi. Listeye bakın.');
+        });
+
+        // Yükle
+        loadBtn.addEventListener('click', () => {
+            const json = jsonTextarea.value.trim();
+            if (json) {
+                try {
+                    const data = JSON.parse(json);
+                    const dosyalar = data.filter(d =>
+                        d.taraflar && d.taraflar.includes('Dosyası') &&
+                        !['Birim', 'Rol', 'Mağdur', 'Sanık', 'Davacı', 'Davalı'].includes(d.mahkeme)
+                    );
+
+                    fileList.innerHTML = '';
+                    dosyalar.forEach(d => {
+                        const div = document.createElement('div');
+                        div.className = 'file-item';
+                        div.innerHTML = `
+                            <h4>${d.mahkeme}</h4>
+                            <p><strong>Dosya No:</strong> ${d.dosyaNo}</p>
+                            <p>${d.taraflar}</p>
+                        `;
+                        fileList.appendChild(div);
+                    });
+
+                    modal.classList.remove('active');
+                    jsonTextarea.value = '';
+                    alert(`✅ ${dosyalar.length} dosya yüklendi!`);
+                } catch (e) {
+                    alert('❌ Geçersiz JSON formatı: ' + e.message);
+                }
+            }
+        });
+
+        // Enter tuşu ile yükle
+        jsonTextarea.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                loadBtn.click();
+            }
+        });
+
+        console.log('✅ UYAP Desktop yüklendi');
+        logToDiagnostics('✅ Uygulama Başlatıldı. Sürüm: Stable-Fix-1.0');
+
+        // --- DIAGNOSTICS HELPERS ---
+        function logToDiagnostics(msg) {
+            const panel = document.getElementById('diagnostics-content');
+            if (panel) {
+                const time = new Date().toLocaleTimeString();
+                panel.innerHTML += `<div><span style="color:#888">[${time}]</span> ${msg}</div>`;
+                panel.scrollTop = panel.scrollHeight; // Auto-scroll
+            }
+            console.log('[DIAG]', msg);
+        }
+
+        // IPC: Receive Generic Log
+        ipcRenderer.on('log-message', (event, msg) => {
+            logToDiagnostics(msg);
+        });
+
+        // Update existing handlers to log
+        const originalOnParty = ipcRenderer.listeners('uyap-party-data-captured')[0];
+        // We can't easily wrap existing listeners without re-defining them, 
+        // so we'll add a separate logger listener for the same events
+        ipcRenderer.on('uyap-party-data-captured', (e, p) => logToDiagnostics(`👥 Taraf Verisi Geldi: ${p.url.substring(0, 50)}...`));
+        ipcRenderer.on('uyap-docs-data-captured', (e, p) => logToDiagnostics(`📄 Evrak Verisi Geldi: ${p.url.substring(0, 50)}...`));
+    </script>
+
+    <!-- DIAGNOSTICS PANEL -->
+    <div id="diagnostics-panel" style="
+        position: fixed;
+        bottom: 0;
+        left: 300px; /* Sidebar width */
+        right: 0;
+        height: 150px;
+        background: #1e1e1e;
+        color: #00ff00;
+        font-family: 'Consolas', monospace;
+        font-size: 12px;
+        z-index: 9999;
+        border-top: 2px solid #333;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.5);
+    ">
+        <div
+            style="background: #333; padding: 2px 10px; font-weight: bold; display:flex; justify-content:space-between; align-items:center;">
+            <span>📟 Sistem Durumu / Loglar</span>
+            <button onclick="document.getElementById('diagnostics-content').innerHTML=''"
+                style="background:none; border:none; color:#fff; cursor:pointer;">Temizle</button>
+        </div>
+        <div id="diagnostics-content" style="
+            flex: 1;
+            overflow-y: auto;
+            padding: 5px 10px;
+            white-space: pre-wrap;
+        "></div>
+    </div>
+
+</html>
