@@ -485,10 +485,11 @@ class UYAPApi {
             task.due = new Date(dueDate).toISOString();
         }
 
-        // Properly escape values for security
-        const escapedToken = String(token).replace(/'/g, "\\'");
-        const escapedTaskListId = String(this.googleIntegration.tasks.taskListId).replace(/'/g, "\\'");
-        const taskJson = JSON.stringify(task);
+        // Properly escape values for security (escape both backslashes and quotes)
+        const escapeForTemplate = (str) => String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const escapedToken = escapeForTemplate(token);
+        const escapedTaskListId = escapeForTemplate(this.googleIntegration.tasks.taskListId);
+        const taskJson = JSON.stringify(task).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
         const script = `
             (async () => {
@@ -499,7 +500,7 @@ class UYAPApi {
                             'Authorization': 'Bearer ${escapedToken}',
                             'Content-Type': 'application/json'
                         },
-                        body: '${taskJson.replace(/'/g, "\\'")}'
+                        body: '${taskJson}'
                     });
                     
                     if (!response.ok) {
@@ -559,11 +560,12 @@ class UYAPApi {
             return { error: 'Token bulunamadı' };
         }
 
-        // Validate and escape inputs
-        const escapedToken = String(token).replace(/'/g, "\\'");
+        // Validate and escape inputs (escape both backslashes and quotes)
+        const escapeForTemplate = (str) => String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const escapedToken = escapeForTemplate(token);
         const escapedAvukatId = String(avukatId).replace(/[^a-zA-Z0-9]/g, '');
         const fileName = `${escapedAvukatId}.json`;
-        const escapedFolder = String(this.googleIntegration.drive.appDataFolder).replace(/'/g, "\\'");
+        const escapedFolder = escapeForTemplate(this.googleIntegration.drive.appDataFolder);
         const query = `name='${fileName}' and '${escapedFolder}' in parents`;
         const encodedQuery = encodeURIComponent(query);
 
@@ -608,8 +610,9 @@ class UYAPApi {
             description: description
         };
 
-        // Escape values properly
-        const escapedToken = String(token).replace(/'/g, "\\'");
+        // Escape values properly (escape both backslashes and quotes)
+        const escapeForTemplate = (str) => String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const escapedToken = escapeForTemplate(token);
         const metadataJson = JSON.stringify(metadata);
         const dataJson = JSON.stringify(data);
 
