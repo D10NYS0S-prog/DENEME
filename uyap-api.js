@@ -1,12 +1,15 @@
 
 /**
- * UYAP API Wrapper
+ * UYAP API Wrapper - Enhanced Version
  * 
- * Allows direct interaction with UYAP endpoints via webview.executeJavaScript.
- * This bypasses the need for passive XHR interception and provides more reliable data fetching.
- */
-/**
- * UYAP API Wrapper (Session Fixed Version)
+ * Comprehensive UYAP integration with features from imerek.js:
+ * - Google Drive backup integration (NO Calendar - excluded per requirements)
+ * - Google Tasks integration for notes
+ * - Tebligat (notification) checking with PTT integration
+ * - Document/Evrak handling with PDF parsing
+ * - File/Dosya management with queuing
+ * - Badge notifications and menu system
+ * - Database operations with queue management
  * 
  * Implements robust session handling, cookie capturing, and multi-strategy polling
  * to resolve persistent 500/404 errors.
@@ -19,6 +22,42 @@ class UYAPApi {
             kullaniciId: null,
             sessionId: null,
             lastUpdated: null
+        };
+
+        // Queue management (from imerek.js UYAP_EXT.DB.queue)
+        this.queue = {
+            dosya: {},
+            evrak: {},
+            taraf: {},
+            tebligat: {},
+            dosyaAyrinti: {},
+            tahsilat: {},
+            borcluBilgileri: {}
+        };
+
+        // Google integration (NO CALENDAR - excluded per requirements)
+        this.googleIntegration = {
+            token: null,
+            enabled: false,
+            // Google Tasks for notes (Görev - included)
+            tasks: {
+                apiUrl: 'https://www.googleapis.com/tasks/v1',
+                taskListId: null
+            },
+            // Google Drive for backup (included)
+            drive: {
+                apiUrl: 'https://www.googleapis.com/drive/v3',
+                appDataFolder: 'appDataFolder'
+            }
+        };
+
+        // Badge and notification system
+        this.badges = {
+            dosyalar: 0,
+            evraklar: 0,
+            tebligatlar: 0,
+            islemlerim: 0,
+            notlarim: 0
         };
 
         // Initialize session immediately
@@ -380,6 +419,526 @@ class UYAPApi {
         }
 
         return 1; // Default
+    }
+
+    /**
+     * ============================================
+     * GOOGLE INTEGRATION (NO CALENDAR)
+     * Features from imerek.js UYAP_EXT.GOOGLE
+     * ============================================
+     */
+
+    /**
+     * Get Google access token
+     * Note: Calendar functionality excluded per requirements
+     */
+    async getGoogleAccessToken() {
+        if (this.googleIntegration.token) {
+            return this.googleIntegration.token;
+        }
+
+        // Check localStorage for existing token
+        const script = `
+            (() => {
+                return localStorage.getItem('_token');
+            })();
+        `;
+
+        try {
+            const token = await ipcRenderer.invoke('uyap-execute-script', script);
+            if (token && !token.error) {
+                this.googleIntegration.token = token;
+                return token;
+            }
+        } catch (error) {
+            console.warn('❌ Google token alınamadı:', error);
+        }
+
+        return null;
+    }
+
+    /**
+     * Google Tasks Integration (for notes/görev)
+     * Create a task from a note
+     */
+    async createGoogleTask(title, notes, dueDate = null) {
+        const token = await this.getGoogleAccessToken();
+        if (!token) {
+            console.warn('Google Tasks: Token bulunamadı');
+            return { error: 'Token bulunamadı' };
+        }
+
+        // Ensure task list exists
+        if (!this.googleIntegration.tasks.taskListId) {
+            const taskLists = await this.getGoogleTaskLists();
+            if (taskLists && taskLists.items && taskLists.items.length > 0) {
+                this.googleIntegration.tasks.taskListId = taskLists.items[0].id;
+            }
+        }
+
+        const task = {
+            title: title,
+            notes: notes
+        };
+
+        if (dueDate) {
+            task.due = new Date(dueDate).toISOString();
+        }
+
+        const script = `
+            (async () => {
+                try {
+                    const response = await fetch('${this.googleIntegration.tasks.apiUrl}/lists/${this.googleIntegration.tasks.taskListId}/tasks', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer ${token}',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(${JSON.stringify(task)})
+                    });
+                    
+                    if (!response.ok) {
+                        return { error: 'HTTP ' + response.status };
+                    }
+                    
+                    return await response.json();
+                } catch(error) {
+                    return { error: error.message };
+                }
+            })();
+        `;
+
+        return await ipcRenderer.invoke('uyap-execute-script', script);
+    }
+
+    /**
+     * Get Google Task Lists
+     */
+    async getGoogleTaskLists() {
+        const token = await this.getGoogleAccessToken();
+        if (!token) {
+            return { error: 'Token bulunamadı' };
+        }
+
+        const script = `
+            (async () => {
+                try {
+                    const response = await fetch('${this.googleIntegration.tasks.apiUrl}/users/@me/lists', {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': 'Bearer ${token}'
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        return { error: 'HTTP ' + response.status };
+                    }
+                    
+                    return await response.json();
+                } catch(error) {
+                    return { error: error.message };
+                }
+            })();
+        `;
+
+        return await ipcRenderer.invoke('uyap-execute-script', script);
+    }
+
+    /**
+     * Google Drive Integration (for backup)
+     * Search for backup files in appDataFolder
+     */
+    async searchGoogleDriveBackups(avukatId) {
+        const token = await this.getGoogleAccessToken();
+        if (!token) {
+            return { error: 'Token bulunamadı' };
+        }
+
+        const fileName = `${avukatId}.json`;
+        const query = `name='${fileName}' and '${this.googleIntegration.drive.appDataFolder}' in parents`;
+
+        const script = `
+            (async () => {
+                try {
+                    const response = await fetch('${this.googleIntegration.drive.apiUrl}/files?spaces=appDataFolder&fields=*&orderBy=createdTime desc&q=${encodeURIComponent(query)}', {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': 'Bearer ${token}'
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        return { error: 'HTTP ' + response.status };
+                    }
+                    
+                    const data = await response.json();
+                    return data.files || [];
+                } catch(error) {
+                    return { error: error.message };
+                }
+            })();
+        `;
+
+        return await ipcRenderer.invoke('uyap-execute-script', script);
+    }
+
+    /**
+     * Upload backup to Google Drive
+     */
+    async uploadToGoogleDrive(data, fileName, description = '') {
+        const token = await this.getGoogleAccessToken();
+        if (!token) {
+            return { error: 'Token bulunamadı' };
+        }
+
+        const metadata = {
+            name: fileName,
+            mimeType: 'application/json',
+            parents: [this.googleIntegration.drive.appDataFolder],
+            description: description
+        };
+
+        const script = `
+            (async () => {
+                try {
+                    const formData = new FormData();
+                    formData.append('metadata', new Blob([JSON.stringify(${JSON.stringify(metadata)})], { type: 'application/json' }));
+                    formData.append('file', new Blob([JSON.stringify(${JSON.stringify(data)})], { type: 'application/json' }));
+                    
+                    const response = await fetch('${this.googleIntegration.drive.apiUrl}/upload/drive/v3/files?uploadType=multipart&fields=*', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer ${token}'
+                        },
+                        body: formData
+                    });
+                    
+                    if (!response.ok) {
+                        return { error: 'HTTP ' + response.status };
+                    }
+                    
+                    return await response.json();
+                } catch(error) {
+                    return { error: error.message };
+                }
+            })();
+        `;
+
+        return await ipcRenderer.invoke('uyap-execute-script', script);
+    }
+
+    /**
+     * Download backup from Google Drive
+     */
+    async downloadFromGoogleDrive(fileId, progressCallback = null) {
+        const token = await this.getGoogleAccessToken();
+        if (!token) {
+            return { error: 'Token bulunamadı' };
+        }
+
+        const script = `
+            (async () => {
+                try {
+                    const response = await fetch('${this.googleIntegration.drive.apiUrl}/files/${fileId}?alt=media', {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': 'Bearer ${token}',
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        return { error: 'HTTP ' + response.status };
+                    }
+                    
+                    return await response.json();
+                } catch(error) {
+                    return { error: error.message };
+                }
+            })();
+        `;
+
+        return await ipcRenderer.invoke('uyap-execute-script', script);
+    }
+
+    /**
+     * Delete backup file from Google Drive
+     */
+    async deleteFromGoogleDrive(fileId) {
+        const token = await this.getGoogleAccessToken();
+        if (!token) {
+            return { error: 'Token bulunamadı' };
+        }
+
+        const script = `
+            (async () => {
+                try {
+                    const response = await fetch('${this.googleIntegration.drive.apiUrl}/files/${fileId}', {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': 'Bearer ${token}'
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        return { error: 'HTTP ' + response.status };
+                    }
+                    
+                    return { success: true };
+                } catch(error) {
+                    return { error: error.message };
+                }
+            })();
+        `;
+
+        return await ipcRenderer.invoke('uyap-execute-script', script);
+    }
+
+    /**
+     * ============================================
+     * TEBLIGAT (NOTIFICATION) OPERATIONS
+     * Features from imerek.js UYAP_EXT.DB.tebligatCheck
+     * ============================================
+     */
+
+    /**
+     * Check tebligat status with PTT integration
+     */
+    async checkTebligatStatus(tebligatList) {
+        console.log(`📮 Tebligatlar kontrol ediliyor: ${tebligatList.length} adet`);
+        
+        const results = [];
+        
+        for (let i = 0; i < tebligatList.length; i++) {
+            const tebligat = tebligatList[i];
+            
+            // Check if it's eTebligat (electronic notification)
+            if (tebligat.eTebligat) {
+                // For eTebligat, calculate delivery based on date
+                const result = this.calculateETebligatStatus(tebligat);
+                results.push(result);
+            } else if (tebligat.barkodNo && tebligat.barkodNo > 0) {
+                // For physical delivery, check with PTT (via main process)
+                try {
+                    const pttResult = await ipcRenderer.invoke('check-ptt-status', {
+                        barkodNo: tebligat.barkodNo,
+                        index: i,
+                        total: tebligatList.length
+                    });
+                    
+                    results.push({
+                        ...tebligat,
+                        ...pttResult,
+                        checked: true
+                    });
+                } catch (error) {
+                    console.error(`PTT kontrolü hatası (${tebligat.barkodNo}):`, error);
+                    results.push({
+                        ...tebligat,
+                        error: error.message,
+                        checked: false
+                    });
+                }
+            } else {
+                // No barcode, can't track
+                results.push({
+                    ...tebligat,
+                    durum: 'BARKOD BULUNAMADI',
+                    checked: false
+                });
+            }
+        }
+        
+        console.log(`✅ Tebligat kontrolü tamamlandı: ${results.length} adet`);
+        return results;
+    }
+
+    /**
+     * Calculate eTebligat (electronic notification) status
+     * eTebligat is considered delivered 5 days after being sent
+     */
+    calculateETebligatStatus(tebligat) {
+        const sentDate = new Date(tebligat.evrakTarihi || tebligat.lastStateTarihi);
+        const now = new Date();
+        const daysSinceSent = Math.ceil((now - sentDate) / (1000 * 60 * 60 * 24));
+        
+        const result = { ...tebligat };
+        
+        if (daysSinceSent >= 5) {
+            const deliveryDate = new Date(sentDate);
+            deliveryDate.setDate(sentDate.getDate() + 5);
+            
+            result.isLastState = 2; // Delivered
+            result.lastStateTarihi = deliveryDate;
+            result.durum = `${Math.abs(daysSinceSent - 5)} GÜN ÖNCE UETS HESABINDA TEBLİĞ EDİLDİ`;
+        } else {
+            result.isLastState = 0; // Waiting
+            result.lastStateTarihi = sentDate;
+            result.durum = `UETS HESABINDA BEKLEMEDE(${daysSinceSent}. GÜN)`;
+        }
+        
+        return result;
+    }
+
+    /**
+     * Parse PDF for tebligat information
+     * Extract barcode and content from notification PDF
+     */
+    async parseTebligatPDF(pdfData) {
+        // This would typically use a PDF parsing library
+        // For now, return a placeholder structure
+        console.log('📄 Tebligat PDF ayrıştırılıyor...');
+        
+        try {
+            // PDF parsing would happen here
+            // Using ipcRenderer to delegate to main process if needed
+            const result = await ipcRenderer.invoke('parse-tebligat-pdf', pdfData);
+            
+            return {
+                barkodNo: result.barkodNo || 0,
+                icerik: result.icerik || '?',
+                eTebligat: result.eTebligat || false
+            };
+        } catch (error) {
+            console.error('PDF ayrıştırma hatası:', error);
+            return {
+                barkodNo: 0,
+                icerik: '?',
+                eTebligat: false,
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * ============================================
+     * DOSYA (FILE) OPERATIONS
+     * Features from imerek.js UYAP_EXT.DB
+     * ============================================
+     */
+
+    /**
+     * Get file details with retry logic
+     */
+    async getDosyaDetails(dosyaId, includeDetails = true) {
+        console.log(`📁 Dosya detayları alınıyor: ${dosyaId}`);
+        
+        const session = await this.ensureSession();
+        let details = {};
+        
+        // Get basic file info
+        const payload = { dosyaId: dosyaId.toString() };
+        
+        // Get file details
+        if (includeDetails) {
+            const detailsResponse = await this._fetchWithSession('/dosyaAyrintiBilgileri_brd.ajx', payload, session);
+            if (this.isValidResponse(detailsResponse)) {
+                details = detailsResponse;
+            }
+        }
+        
+        // Get parties
+        const parties = await this.getParties(dosyaId);
+        
+        // Get documents summary
+        const evrakPageTotal = await this.getEvrakPageTotal(dosyaId);
+        
+        return {
+            dosyaId: dosyaId,
+            details: details,
+            parties: parties,
+            evrakPageTotal: evrakPageTotal,
+            timestamp: new Date().toISOString()
+        };
+    }
+
+    /**
+     * Sync file from UYAP with queue management
+     */
+    async syncDosya(dosyaId) {
+        // Check if already in queue
+        if (this.queue.dosya[dosyaId]) {
+            console.log(`⏳ Dosya zaten kuyrukta: ${dosyaId}`);
+            return this.queue.dosya[dosyaId];
+        }
+        
+        // Add to queue
+        const queueId = this.generateQueueId();
+        this.queue.dosya[queueId] = new Promise(async (resolve, reject) => {
+            try {
+                console.log(`🔄 Dosya senkronize ediliyor: ${dosyaId}`);
+                
+                const dosyaData = await this.getDosyaDetails(dosyaId, true);
+                
+                console.log(`✅ Dosya senkronize edildi: ${dosyaId}`);
+                resolve(dosyaData);
+            } catch (error) {
+                console.error(`❌ Dosya senkronizasyon hatası: ${dosyaId}`, error);
+                reject(error);
+            } finally {
+                // Remove from queue
+                delete this.queue.dosya[queueId];
+            }
+        });
+        
+        return this.queue.dosya[queueId];
+    }
+
+    /**
+     * Generate unique queue ID
+     */
+    generateQueueId() {
+        return Math.floor(Math.random() * 0x10000).toString(16).substring(1);
+    }
+
+    /**
+     * ============================================
+     * BADGE AND NOTIFICATION SYSTEM
+     * Features from imerek.js UYAP_EXT.MENU
+     * ============================================
+     */
+
+    /**
+     * Update badge counts
+     */
+    async updateBadges(counts) {
+        if (counts.dosyalar !== undefined) this.badges.dosyalar = counts.dosyalar;
+        if (counts.evraklar !== undefined) this.badges.evraklar = counts.evraklar;
+        if (counts.tebligatlar !== undefined) this.badges.tebligatlar = counts.tebligatlar;
+        if (counts.islemlerim !== undefined) this.badges.islemlerim = counts.islemlerim;
+        if (counts.notlarim !== undefined) this.badges.notlarim = counts.notlarim;
+        
+        console.log('🔔 Badge güncellendi:', this.badges);
+        
+        // Emit event for UI update
+        if (typeof window !== 'undefined' && window.dispatchEvent) {
+            window.dispatchEvent(new CustomEvent('uyap-badges-updated', {
+                detail: this.badges
+            }));
+        }
+        
+        return this.badges;
+    }
+
+    /**
+     * Get current badge counts
+     */
+    getBadges() {
+        return { ...this.badges };
+    }
+
+    /**
+     * Reset all badges
+     */
+    resetBadges() {
+        this.badges = {
+            dosyalar: 0,
+            evraklar: 0,
+            tebligatlar: 0,
+            islemlerim: 0,
+            notlarim: 0
+        };
+        return this.badges;
     }
 
 
