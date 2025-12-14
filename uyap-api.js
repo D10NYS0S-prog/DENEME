@@ -941,6 +941,753 @@ class UYAPApi {
         return this.badges;
     }
 
+    /**
+     * ============================================
+     * NOTE MANAGEMENT SYSTEM
+     * Features from imerek.js UYAP_EXT.DB.notuAl/notuKaydet
+     * ============================================
+     */
+
+    /**
+     * Save a note
+     */
+    async saveNote(kaynakId, noteText, noteType = 'dosya') {
+        console.log(`📝 Not kaydediliyor: ${kaynakId}`);
+        
+        try {
+            const noteData = {
+                type: noteType,
+                alinan_not: noteText,
+                kaynakId: kaynakId,
+                created_tarihi: new Date().toISOString(),
+                creator: 'user' // Would be replaced with actual user info
+            };
+            
+            // Save via IPC to main process (database operation)
+            const result = await ipcRenderer.invoke('save-note', noteData);
+            
+            if (result && !result.error) {
+                console.log(`✅ Not kaydedildi: ${kaynakId}`);
+                // Update badge
+                await this.updateBadges({ notlarim: (this.badges.notlarim || 0) + 1 });
+            }
+            
+            return result;
+        } catch (error) {
+            console.error('Not kaydetme hatası:', error);
+            return { error: error.message };
+        }
+    }
+
+    /**
+     * Get notes for a source
+     */
+    async getNotes(kaynakId, noteType = 'dosya', limit = 10) {
+        console.log(`📖 Notlar alınıyor: ${kaynakId}`);
+        
+        try {
+            const result = await ipcRenderer.invoke('get-notes', {
+                kaynakId: kaynakId,
+                type: noteType,
+                limit: limit
+            });
+            
+            return result || [];
+        } catch (error) {
+            console.error('Not alma hatası:', error);
+            return { error: error.message };
+        }
+    }
+
+    /**
+     * Delete a note
+     */
+    async deleteNote(noteId) {
+        console.log(`🗑️ Not siliniyor: ${noteId}`);
+        
+        try {
+            const result = await ipcRenderer.invoke('delete-note', noteId);
+            
+            if (result && !result.error) {
+                console.log(`✅ Not silindi: ${noteId}`);
+                // Update badge
+                const currentCount = Math.max(0, (this.badges.notlarim || 0) - 1);
+                await this.updateBadges({ notlarim: currentCount });
+            }
+            
+            return result;
+        } catch (error) {
+            console.error('Not silme hatası:', error);
+            return { error: error.message };
+        }
+    }
+
+    /**
+     * ============================================
+     * TAHSILAT (PAYMENT) OPERATIONS
+     * Features from imerek.js UYAP_EXT.DB
+     * ============================================
+     */
+
+    /**
+     * Get payment/collection information for a file
+     */
+    async getTahsilatBilgileri(dosyaId, dosyaTurKod = 1) {
+        console.log(`💰 Tahsilat bilgileri alınıyor: ${dosyaId}`);
+        
+        try {
+            const session = await this.ensureSession();
+            const payload = {
+                dosyaId: dosyaId.toString(),
+                dosyaTurKod: dosyaTurKod
+            };
+            
+            const response = await this._fetchWithSession('/dosya_tahsilat_reddiyat_bilgileri_brd.ajx', payload, session);
+            
+            if (this.isValidResponse(response)) {
+                console.log(`✅ Tahsilat bilgileri alındı: ${dosyaId}`);
+                
+                // Parse the response
+                return {
+                    toplamTahsilat: response.toplamTahsilat || 0,
+                    toplamReddiyat: response.toplamreddiyat || 0,
+                    toplamTahsilHarci: response.toplamTahsilHarci || 0,
+                    toplamKalan: response.toplamKalan || 0,
+                    toplamTeminat: response.toplamTeminat || 0,
+                    harcList: response.harcList || [],
+                    tahsilatList: response.tahsilatList || [],
+                    reddiyatList: response.reddiyatList || [],
+                    haricen: response.haricen,
+                    isIcraMi: response.isIcraMi
+                };
+            }
+            
+            return { error: 'Tahsilat bilgileri alınamadı' };
+        } catch (error) {
+            console.error('Tahsilat bilgileri alma hatası:', error);
+            return { error: error.message };
+        }
+    }
+
+    /**
+     * ============================================
+     * SAFAHAT (CASE PHASE) OPERATIONS
+     * Features from imerek.js UYAP_EXT.DB
+     * ============================================
+     */
+
+    /**
+     * Query safahat (case phases) for a date range
+     */
+    async querySafahat(yargiTuru, yargiBirimi, baslangicTarihi, bitisTarihi, safahatTuru = '') {
+        console.log(`📅 Safahat sorgulanıyor: ${yargiBirimi}`);
+        
+        try {
+            const session = await this.ensureSession();
+            
+            // Format dates as DD.MM.YYYY
+            const formatDate = (date) => {
+                const d = new Date(date);
+                return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+            };
+            
+            const payload = {
+                baslangicTarihi: formatDate(baslangicTarihi),
+                bitisTarihi: formatDate(bitisTarihi),
+                safahatTuru: safahatTuru,
+                yargiBirimi: yargiBirimi,
+                yargiTuru: yargiTuru
+            };
+            
+            const response = await this._fetchWithSession('/avukat_safahat_sorgula_brd.ajx', payload, session);
+            
+            if (this.isValidResponse(response)) {
+                console.log(`✅ Safahat sorgulandı: ${response.length || 0} kayıt`);
+                return response;
+            }
+            
+            return { error: 'Safahat sorgulanamadı' };
+        } catch (error) {
+            console.error('Safahat sorgulama hatası:', error);
+            return { error: error.message };
+        }
+    }
+
+    /**
+     * Query all judicial units for safahat
+     */
+    async queryAllSafahat(yargiTuru, baslangicTarihi, bitisTarihi) {
+        console.log(`📊 Tüm birimler için safahat sorgulanıyor...`);
+        
+        try {
+            const session = await this.ensureSession();
+            
+            // First, get judicial units
+            const unitsPayload = { yargiTuru: yargiTuru };
+            const unitsResponse = await this._fetchWithSession('/yargiBirimleriSorgula_brd.ajx', unitsPayload, session);
+            
+            if (!this.isValidResponse(unitsResponse)) {
+                return { error: 'Yargı birimleri alınamadı' };
+            }
+            
+            const allSafahat = [];
+            const units = Array.isArray(unitsResponse) ? unitsResponse : unitsResponse.data || [];
+            
+            // Query each unit
+            for (let i = 0; i < units.length; i++) {
+                const unit = units[i];
+                console.log(`  Sorgulanıyor: ${unit.kod} (${i + 1}/${units.length})`);
+                
+                const safahat = await this.querySafahat(
+                    yargiTuru,
+                    unit.tablo,
+                    baslangicTarihi,
+                    bitisTarihi
+                );
+                
+                if (Array.isArray(safahat)) {
+                    allSafahat.push(...safahat);
+                }
+            }
+            
+            console.log(`✅ Toplam ${allSafahat.length} safahat kaydı bulundu`);
+            return allSafahat;
+            
+        } catch (error) {
+            console.error('Tüm safahat sorgulama hatası:', error);
+            return { error: error.message };
+        }
+    }
+
+    /**
+     * ============================================
+     * ERROR HANDLING AND RETRY LOGIC
+     * Features from imerek.js UYAP_EXT.TOOL.errors
+     * ============================================
+     */
+
+    /**
+     * Common UYAP errors
+     */
+    getErrorCodes() {
+        return {
+            DOSYA_BULUNAMADI: {
+                errorCode: '404',
+                error: 'Dosya bulunamadı',
+                message: 'Dosya sistemde bulunamadı veya erişim izniniz yok'
+            },
+            OTURUM_KAPALI: {
+                errorCode: '401',
+                error: 'Oturum kapalı',
+                message: 'UYAP oturumunuz kapalı, lütfen tekrar giriş yapın'
+            },
+            YETKISIZ_ISLEM: {
+                errorCode: '403',
+                error: 'Yetkisiz işlem',
+                message: 'Bu işlem için yetkiniz bulunmuyor'
+            },
+            SUNUCU_HATASI: {
+                errorCode: '500',
+                error: 'Sunucu hatası',
+                message: 'UYAP sunucusunda bir hata oluştu'
+            },
+            DOSYA_AKTIF_DEGIL: {
+                errorCode: 'DOSYA_INACTIVE',
+                error: 'Dosya aktif değil',
+                message: 'Dosya kapatılmış veya arşivlenmiş'
+            },
+            ZAMAN_ASIMI: {
+                errorCode: 'TIMEOUT',
+                error: 'Zaman aşımı',
+                message: 'İşlem süresi doldu, lütfen tekrar deneyin'
+            }
+        };
+    }
+
+    /**
+     * Handle UYAP API errors with retry logic
+     */
+    async handleError(error, context = {}, retryCount = 0, maxRetries = 3) {
+        const errors = this.getErrorCodes();
+        
+        console.error(`❌ UYAP Hatası (Deneme ${retryCount + 1}/${maxRetries}):`, error);
+        
+        // Session expired - refresh and retry
+        if (error.includes('401') || error.includes('OTURUM')) {
+            if (retryCount < maxRetries) {
+                console.log('🔄 Oturum yenileniyor...');
+                await this.initializeSession();
+                return { shouldRetry: true, retryCount: retryCount + 1 };
+            }
+        }
+        
+        // File not found - might need to update dosyaId
+        if (error.includes('404') || error.includes('DOSYA_BULUNAMADI')) {
+            if (retryCount < maxRetries && context.dosyaId) {
+                console.log('🔄 Dosya ID güncelleniyor...');
+                // Would call updateDosyaId here
+                return { shouldRetry: true, retryCount: retryCount + 1 };
+            }
+        }
+        
+        // Server error - retry with exponential backoff
+        if (error.includes('500') || error.includes('SUNUCU')) {
+            if (retryCount < maxRetries) {
+                const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff
+                console.log(`⏳ ${delay}ms beklenip tekrar denenecek...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return { shouldRetry: true, retryCount: retryCount + 1 };
+            }
+        }
+        
+        // No more retries
+        return { shouldRetry: false, error: error };
+    }
+
+    /**
+     * Execute with retry logic
+     */
+    async executeWithRetry(asyncFunction, context = {}, maxRetries = 3) {
+        let retryCount = 0;
+        let lastError = null;
+        
+        while (retryCount <= maxRetries) {
+            try {
+                const result = await asyncFunction();
+                return result;
+            } catch (error) {
+                lastError = error;
+                const errorHandler = await this.handleError(error.message || error, context, retryCount, maxRetries);
+                
+                if (errorHandler.shouldRetry) {
+                    retryCount = errorHandler.retryCount;
+                    continue;
+                } else {
+                    break;
+                }
+            }
+        }
+        
+        // All retries failed
+        console.error(`❌ Tüm denemeler başarısız oldu:`, lastError);
+        return { error: lastError };
+    }
+
+    /**
+     * ============================================
+     * UTILITY FUNCTIONS
+     * ============================================
+     */
+
+    /**
+     * Get yargi turu (court type) code
+     */
+    getYargiTuruCode(birimTuru3) {
+        const mapping = {
+            '0991': 1, // Adli Yargı
+            '0992': 2, // İdari Yargı
+            '6700': 3  // Askeri Yargı
+        };
+        return mapping[birimTuru3] || 1;
+    }
+
+    /**
+     * Format dosya number
+     */
+    formatDosyaNo(dosyaNo) {
+        if (!dosyaNo) return '';
+        
+        // Format: YYYY/XXXXX
+        const parts = dosyaNo.split('/');
+        if (parts.length === 2) {
+            return `${parts[0]}/${parts[1].padStart(5, '0')}`;
+        }
+        return dosyaNo;
+    }
+
+    /**
+     * Parse dosya number
+     */
+    parseDosyaNo(dosyaNo) {
+        const parts = dosyaNo.split('/');
+        if (parts.length === 2) {
+            return {
+                yil: parseInt(parts[0]),
+                sira: parseInt(parts[1])
+            };
+        }
+        return null;
+    }
+
+    /**
+     * Check if dosya is active
+     */
+    isDosyaActive(dosya) {
+        if (!dosya) return false;
+        
+        // Check various status indicators
+        if (dosya.dosyaDurumKod === 0 || dosya.dosyaDurumKod === '0') return false;
+        if (dosya.genelDosyaDurumu === 'Arşivde') return false;
+        if (dosya.durumAdi === 'Arşivde') return false;
+        if (dosya.is_aktif === false || dosya.is_aktif === 'false') return false;
+        
+        return true;
+    }
+
+    /**
+     * ============================================
+     * YARGITAY (SUPREME COURT) OPERATIONS
+     * Features from imerek.js for Yargıtay
+     * ============================================
+     */
+
+    /**
+     * Get Yargıtay chambers (daireler)
+     */
+    async getYargitayDaireleri() {
+        console.log('🏛️ Yargıtay daireleri alınıyor...');
+        
+        try {
+            const session = await this.ensureSession();
+            const response = await this._fetchWithSession('/getYargitayDaireleri.ajx', {}, session);
+            
+            if (this.isValidResponse(response)) {
+                console.log(`✅ ${response.length || 0} Yargıtay dairesi bulundu`);
+                return response;
+            }
+            
+            return { error: 'Yargıtay daireleri alınamadı' };
+        } catch (error) {
+            console.error('Yargıtay daireleri alma hatası:', error);
+            return { error: error.message };
+        }
+    }
+
+    /**
+     * Get Yargıtay files
+     */
+    async getYargitayDosyalar(yargitayDairesi) {
+        console.log(`📁 Yargıtay dosyaları alınıyor (Daire: ${yargitayDairesi})...`);
+        
+        try {
+            const session = await this.ensureSession();
+            const payload = { yargitayDairesi: yargitayDairesi };
+            const response = await this._fetchWithSession('/getYargitayDosyalar_brd.ajx', payload, session);
+            
+            if (this.isValidResponse(response)) {
+                console.log(`✅ ${response.length || 0} Yargıtay dosyası bulundu`);
+                return response;
+            }
+            
+            return { error: 'Yargıtay dosyaları alınamadı' };
+        } catch (error) {
+            console.error('Yargıtay dosyaları alma hatası:', error);
+            return { error: error.message };
+        }
+    }
+
+    /**
+     * Get Yargıtay file details
+     */
+    async getYargitayDosyaDetay(dosyaId) {
+        console.log(`📋 Yargıtay dosya detayı alınıyor: ${dosyaId}`);
+        
+        try {
+            const session = await this.ensureSession();
+            const payload = { dosyaId: dosyaId.toString() };
+            const response = await this._fetchWithSession('/yargitayDosyaAyrintiBilgileri_brd.ajx', payload, session);
+            
+            if (this.isValidResponse(response)) {
+                console.log(`✅ Yargıtay dosya detayı alındı`);
+                return response.yargitaySorguDosyaDetayDVO || response;
+            }
+            
+            return { error: 'Yargıtay dosya detayı alınamadı' };
+        } catch (error) {
+            console.error('Yargıtay dosya detayı alma hatası:', error);
+            return { error: error.message };
+        }
+    }
+
+    /**
+     * ============================================
+     * DANIŞTAY (COUNCIL OF STATE) OPERATIONS
+     * Features from imerek.js for Danıştay
+     * ============================================
+     */
+
+    /**
+     * Get Danıştay chambers (daireler)
+     */
+    async getDanistayDaireleri() {
+        console.log('🏛️ Danıştay daireleri alınıyor...');
+        
+        try {
+            const session = await this.ensureSession();
+            const response = await this._fetchWithSession('/avukatDanistayDaireSorgula.ajx', {}, session);
+            
+            if (this.isValidResponse(response)) {
+                console.log(`✅ ${response.length || 0} Danıştay dairesi bulundu`);
+                return response;
+            }
+            
+            return { error: 'Danıştay daireleri alınamadı' };
+        } catch (error) {
+            console.error('Danıştay daireleri alma hatası:', error);
+            return { error: error.message };
+        }
+    }
+
+    /**
+     * Get Danıştay files
+     */
+    async getDanistayDosyalar(danistayDairesi) {
+        console.log(`📁 Danıştay dosyaları alınıyor (Daire: ${danistayDairesi})...`);
+        
+        try {
+            const session = await this.ensureSession();
+            const payload = { danistayDairesi: danistayDairesi };
+            const response = await this._fetchWithSession('/avukatDanistayDosyaSorgula.ajx', payload, session);
+            
+            if (this.isValidResponse(response)) {
+                console.log(`✅ ${response.length || 0} Danıştay dosyası bulundu`);
+                return response;
+            }
+            
+            return { error: 'Danıştay dosyaları alınamadı' };
+        } catch (error) {
+            console.error('Danıştay dosyaları alma hatası:', error);
+            return { error: error.message };
+        }
+    }
+
+    /**
+     * Get Danıştay file details
+     */
+    async getDanistayDosyaDetay(dosyaId) {
+        console.log(`📋 Danıştay dosya detayı alınıyor: ${dosyaId}`);
+        
+        try {
+            const session = await this.ensureSession();
+            const payload = { dosyaId: dosyaId.toString() };
+            const response = await this._fetchWithSession('/danistayDosyaAyrintiBilgileri_brd.ajx', payload, session);
+            
+            if (this.isValidResponse(response)) {
+                console.log(`✅ Danıştay dosya detayı alındı`);
+                return response;
+            }
+            
+            return { error: 'Danıştay dosya detayı alınamadı' };
+        } catch (error) {
+            console.error('Danıştay dosya detayı alma hatası:', error);
+            return { error: error.message };
+        }
+    }
+
+    /**
+     * ============================================
+     * CBS (CUMHURIYET BAŞSAVCILIK) OPERATIONS
+     * Features from imerek.js for CBS
+     * ============================================
+     */
+
+    /**
+     * Get provinces (iller) for CBS queries
+     */
+    async getIller() {
+        console.log('🗺️ İller alınıyor...');
+        
+        try {
+            const session = await this.ensureSession();
+            const response = await this._fetchWithSession('/illeri_getirJSON.ajx', {}, session);
+            
+            if (this.isValidResponse(response)) {
+                console.log(`✅ ${response.length || 0} il bulundu`);
+                return response;
+            }
+            
+            return { error: 'İller alınamadı' };
+        } catch (error) {
+            console.error('İller alma hatası:', error);
+            return { error: error.message };
+        }
+    }
+
+    /**
+     * Query CBS units (birimler) for a province
+     */
+    async getCbsBirimler(ilKodu) {
+        console.log(`🏢 CBS birimleri alınıyor (İl: ${ilKodu})...`);
+        
+        try {
+            const session = await this.ensureSession();
+            const payload = { ilKodu: ilKodu };
+            const response = await this._fetchWithSession('/cbs_birim_sorgula.ajx', payload, session);
+            
+            if (this.isValidResponse(response)) {
+                console.log(`✅ ${response.length || 0} CBS birimi bulundu`);
+                return response;
+            }
+            
+            return { error: 'CBS birimleri alınamadı' };
+        } catch (error) {
+            console.error('CBS birimleri alma hatası:', error);
+            return { error: error.message };
+        }
+    }
+
+    /**
+     * Query CBS files
+     */
+    async getCbsDosyalar(birimId, dosyaDurumKod = 1) {
+        console.log(`📁 CBS dosyaları alınıyor (Birim: ${birimId})...`);
+        
+        try {
+            const session = await this.ensureSession();
+            const payload = {
+                birimId: birimId || '',
+                birimTuru2: birimId,
+                birimTuru3: '3', // CBS
+                dosyaDurumKod: dosyaDurumKod,
+                pageNumber: 1,
+                pageSize: 500
+            };
+            
+            const response = await this._fetchWithSession('/avukat_dosya_sorgula_cbs_brd.ajx', payload, session);
+            
+            if (this.isValidResponse(response)) {
+                console.log(`✅ ${response.length || 0} CBS dosyası bulundu`);
+                return response;
+            }
+            
+            return { error: 'CBS dosyaları alınamadı' };
+        } catch (error) {
+            console.error('CBS dosyaları alma hatası:', error);
+            return { error: error.message };
+        }
+    }
+
+    /**
+     * Sync all CBS files across all provinces
+     * Warning: This is a long-running operation
+     */
+    async syncAllCbsDosyalar(progressCallback = null) {
+        console.log('🔄 Tüm CBS dosyaları senkronize ediliyor...');
+        
+        try {
+            // Get all provinces
+            const iller = await this.getIller();
+            if (!Array.isArray(iller)) {
+                return { error: 'İller alınamadı' };
+            }
+            
+            let totalDosyalar = [];
+            
+            for (let i = 0; i < iller.length; i++) {
+                const il = iller[i];
+                
+                if (progressCallback) {
+                    progressCallback({
+                        stage: 'il',
+                        current: i + 1,
+                        total: iller.length,
+                        ilAdi: il.ilAdi || il.il
+                    });
+                }
+                
+                // Get CBS units for this province
+                const birimler = await this.getCbsBirimler(il.il);
+                
+                if (Array.isArray(birimler)) {
+                    for (let j = 0; j < birimler.length; j++) {
+                        const birim = birimler[j];
+                        
+                        if (progressCallback) {
+                            progressCallback({
+                                stage: 'birim',
+                                ilCurrent: i + 1,
+                                ilTotal: iller.length,
+                                birimCurrent: j + 1,
+                                birimTotal: birimler.length
+                            });
+                        }
+                        
+                        // Get files for this unit
+                        const dosyalar = await this.getCbsDosyalar(birim.birimId);
+                        
+                        if (Array.isArray(dosyalar)) {
+                            totalDosyalar.push(...dosyalar);
+                        }
+                    }
+                }
+            }
+            
+            console.log(`✅ Toplam ${totalDosyalar.length} CBS dosyası senkronize edildi`);
+            return totalDosyalar;
+            
+        } catch (error) {
+            console.error('CBS dosyaları senkronizasyon hatası:', error);
+            return { error: error.message };
+        }
+    }
+
+    /**
+     * ============================================
+     * ADVANCED SEARCH OPERATIONS
+     * ============================================
+     */
+
+    /**
+     * Advanced file search
+     */
+    async searchDosyalar(criteria) {
+        console.log('🔍 Gelişmiş dosya araması yapılıyor...', criteria);
+        
+        try {
+            const session = await this.ensureSession();
+            
+            const payload = {
+                birimTuru3: criteria.yargiTuru || '',
+                birimTuru2: criteria.birimId || '',
+                birimId: criteria.birimId || '',
+                dosyaDurumKod: criteria.dosyaDurumKod !== undefined ? criteria.dosyaDurumKod : 1,
+                dosyaYil: criteria.dosyaYil || '',
+                dosyaSira: criteria.dosyaSira || '',
+                pageNumber: criteria.pageNumber || 1,
+                pageSize: criteria.pageSize || 500
+            };
+            
+            const response = await this._fetchWithSession('/search_phrase_detayli.ajx', payload, session);
+            
+            if (this.isValidResponse(response)) {
+                console.log(`✅ ${response.length || 0} dosya bulundu`);
+                return response;
+            }
+            
+            return { error: 'Dosya bulunamadı' };
+        } catch (error) {
+            console.error('Dosya arama hatası:', error);
+            return { error: error.message };
+        }
+    }
+
+    /**
+     * Search by file number
+     */
+    async searchByDosyaNo(dosyaNo, birimId = '', yargiTuru = '') {
+        const parsed = this.parseDosyaNo(dosyaNo);
+        if (!parsed) {
+            return { error: 'Geçersiz dosya numarası formatı' };
+        }
+        
+        return await this.searchDosyalar({
+            birimId: birimId,
+            yargiTuru: yargiTuru,
+            dosyaYil: parsed.yil,
+            dosyaSira: parsed.sira
+        });
+    }
+
 
     // Helper: Valid Response Check
     isValidResponse(response) {
