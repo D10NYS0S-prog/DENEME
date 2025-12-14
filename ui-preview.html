@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UYAP Desktop Stage 2 - UI Preview</title>
+    <link rel="stylesheet" href="styles-stage2.css">
+    <style>
+        /* Demo-specific styles */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        #uyap-browser {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 18px;
+        }
+        
+        .demo-content {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .demo-content h2 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .demo-content p {
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Header with Badge System -->
+        <header>
+            <div class="header-left">
+                <h1>🏛️ UYAP Desktop</h1>
+                <div class="session-status">
+                    <span class="status-dot active"></span>
+                    <span class="status-text">Bağlı</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="badges-container">
+                    <div class="badge-item" title="Yeni Dosyalar">
+                        <span class="badge-icon">📁</span>
+                        <span class="badge-count">5</span>
+                    </div>
+                    <div class="badge-item" title="Yeni Evraklar">
+                        <span class="badge-icon">📄</span>
+                        <span class="badge-count">12</span>
+                    </div>
+                    <div class="badge-item" title="Bekleyen Tebligatlar">
+                        <span class="badge-icon">📮</span>
+                        <span class="badge-count">3</span>
+                    </div>
+                    <div class="badge-item" title="Notlarım">
+                        <span class="badge-icon">📝</span>
+                        <span class="badge-count">8</span>
+                    </div>
+                </div>
+                <button class="btn btn-settings">⚙️</button>
+                <button class="btn">🔄</button>
+            </div>
+        </header>
+
+        <div id="main">
+            <!-- Sidebar with Tabs -->
+            <div id="sidebar">
+                <div class="tabs-container">
+                    <button class="tab-btn active">📁 Dosyalar</button>
+                    <button class="tab-btn">📝 Notlar</button>
+                    <button class="tab-btn">☁️ Google</button>
+                    <button class="tab-btn">⚖️ Özel Mahkemeler</button>
+                </div>
+
+                <!-- Dosyalar Tab -->
+                <div class="tab-content active">
+                    <div class="search-container">
+                        <input type="text" placeholder="Dosya No..." class="search-input" value="2024/123">
+                        <button class="btn-primary">Ara</button>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn-action">🔄 Tümünü Sorgula</button>
+                        <button class="btn-action">📅 Safahat Sorgula</button>
+                    </div>
+
+                    <div class="content-list">
+                        <!-- Sample File Cards -->
+                        <div class="file-card">
+                            <div class="file-number">2024/123 Esas</div>
+                            <div class="file-status">Açık</div>
+                            <div class="file-detail-item"><strong>Birim:</strong> Ankara 5. Asliye Hukuk Mahkemesi</div>
+                            <div class="file-detail-item">👥 4 taraf</div>
+                        </div>
+
+                        <div class="file-card">
+                            <div class="file-number">2024/456 Esas</div>
+                            <div class="file-status">Açık</div>
+                            <div class="file-detail-item"><strong>Birim:</strong> İstanbul 2. İcra Dairesi</div>
+                            <div class="file-detail-item">👥 2 taraf</div>
+                        </div>
+
+                        <div class="file-card">
+                            <div class="file-number">2023/789 Esas</div>
+                            <div class="file-status">Karar</div>
+                            <div class="file-detail-item"><strong>Birim:</strong> İzmir 1. Asliye Ticaret Mahkemesi</div>
+                            <div class="file-detail-item">👥 6 taraf</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Browser Container -->
+            <div id="browser-container">
+                <div id="uyap-browser">
+                    <div class="demo-content">
+                        <h2>UYAP Beta Webview</h2>
+                        <p>Bu alanda UYAP Beta portalı görüntülenir</p>
+                        <p style="font-size: 14px; color: #ccc; margin-top: 20px;">
+                            🔒 Session yakalanır ve API istekleri otomatik yapılır
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification Demo -->
+        <div id="toastContainer">
+            <div class="toast success">
+                <span class="toast-icon">✅</span>
+                <span class="toast-message">5 dosya yüklendi</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
