@@ -428,8 +428,6 @@ async function loadNotlarTab(dosyaId, contentEl) {
 }
 
 async function loadTebligatTab(dosyaId, contentEl) {
-    const file = currentFilesMap.get(dosyaId);
-    
     contentEl.innerHTML = `
         <div class="tebligat-section">
             <h4>📮 Tebligat Kontrolü</h4>
@@ -1106,6 +1104,10 @@ window.openCBS = async function() {
 window.loadCbsBirimler = async function(ilKodu, ilAdi) {
     showToast(`${ilAdi} CBS birimleri yükleniyor...`, 'info');
     
+    // Store ilKodu for back navigation
+    window.currentCbsIlKodu = ilKodu;
+    window.currentCbsIlAdi = ilAdi;
+    
     try {
         const birimler = await uyapApi.getCbsBirimler(ilKodu);
         
@@ -1158,7 +1160,7 @@ window.loadCbsFiles = async function(birimId, birimAdi) {
         const filesHtml = `
             <div class="special-court-files">
                 <div style="margin-bottom: 15px;">
-                    <button class="btn-secondary" onclick="loadCbsBirimler('${birimId}', 'İl')">← Birimlere Dön</button>
+                    <button class="btn-secondary" onclick="loadCbsBirimler('${window.currentCbsIlKodu || ''}', '${window.currentCbsIlAdi || 'İl'}')">← Birimlere Dön</button>
                 </div>
                 <h4>${birimAdi} - Dosyalar</h4>
                 <p class="text-muted">Toplam ${Array.isArray(dosyalar) ? dosyalar.length : 0} dosya</p>

@@ -352,8 +352,8 @@ ipcMain.on('google-authorize', () => {
 });
 
 // PTT Status Check Handler (Stage 3)
-ipcMain.handle('check-ptt-status', async (event, { barkodNo, index, total }) => {
-    console.log(`📮 PTT durumu kontrol ediliyor: ${barkodNo} (${index + 1}/${total})`);
+ipcMain.handle('check-ptt-status', async (event, { barkodNo }) => {
+    console.log(`📮 PTT durumu kontrol ediliyor: ${barkodNo}`);
     
     // Simulate PTT API call (in production, this would call actual PTT Kargo API)
     // PTT Kargo API documentation: https://gonderitakip.ptt.gov.tr/

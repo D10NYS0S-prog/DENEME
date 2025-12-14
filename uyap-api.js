@@ -748,9 +748,7 @@ class UYAPApi {
                 // For physical delivery, check with PTT (via main process)
                 try {
                     const pttResult = await ipcRenderer.invoke('check-ptt-status', {
-                        barkodNo: tebligat.barkodNo,
-                        index: i,
-                        total: tebligatList.length
+                        barkodNo: tebligat.barkodNo
                     });
                     
                     results.push({
