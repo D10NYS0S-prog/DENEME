@@ -1235,6 +1235,12 @@ function openModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.classList.add('active');
+        
+        // Hide webview to prevent z-index issues (webview always renders on top)
+        const webview = document.getElementById('uyap-browser');
+        if (webview) {
+            webview.style.visibility = 'hidden';
+        }
     }
 }
 
@@ -1242,6 +1248,12 @@ window.closeModal = function(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.classList.remove('active');
+        
+        // Show webview again
+        const webview = document.getElementById('uyap-browser');
+        if (webview) {
+            webview.style.visibility = 'visible';
+        }
     }
 };
 
@@ -1250,6 +1262,12 @@ document.querySelectorAll('.modal').forEach(modal => {
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
             modal.classList.remove('active');
+            
+            // Show webview again
+            const webview = document.getElementById('uyap-browser');
+            if (webview) {
+                webview.style.visibility = 'visible';
+            }
         }
     });
 });
