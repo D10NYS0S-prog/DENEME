@@ -11,6 +11,7 @@ const webview = document.getElementById('uyap-browser');
 let currentFilesMap = new Map();
 let currentNotes = [];
 let currentFileId = null;
+let db = null; // Database instance
 
 console.log('✅ UYAP Desktop Stage 2 Initializing...');
 
@@ -23,10 +24,22 @@ window.addEventListener('DOMContentLoaded', () => {
     initializeSessionMonitor();
     initializeBadges();
     initializeEventListeners();
+    initializeDatabase();
     loadNotes();
     checkGoogleAuth();
     console.log('✅ Stage 2 UI Initialized');
 });
+
+// Initialize database
+async function initializeDatabase() {
+    try {
+        db = await initDatabase();
+        console.log('✅ Veritabanı hazır');
+    } catch (error) {
+        console.error('❌ Veritabanı başlatma hatası:', error);
+        showToast('Veritabanı başlatılamadı', 'error');
+    }
+}
 
 // ============================================================================
 // TAB SYSTEM
