@@ -1059,6 +1059,55 @@ class UYAPApi {
     }
 
     /**
+     * Get all notes (for notes tab)
+     */
+    async getAllNotes() {
+        console.log('📝 Tüm notlar alınıyor...');
+        
+        try {
+            const result = await ipcRenderer.invoke('get-all-notes');
+            return result || [];
+        } catch (error) {
+            console.error('Not listesi hatası:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Get Google Tasks list
+     */
+    async getGoogleTasks(taskListId = '@default') {
+        console.log('✓ Google Tasks alınıyor...');
+        
+        try {
+            const token = await this.getGoogleAccessToken();
+            if (!token) {
+                return { error: 'Google yetkilendirmesi gerekli' };
+            }
+            
+            const url = `${this.googleIntegration.tasks.apiUrl}/lists/${taskListId}/tasks`;
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Google Tasks API hatası: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log(`✅ ${data.items?.length || 0} görev alındı`);
+            return data.items || [];
+            
+        } catch (error) {
+            console.error('Google Tasks hatası:', error);
+            return { error: error.message };
+        }
+    }
+
+    /**
      * ============================================
      * TAHSILAT (PAYMENT) OPERATIONS
      * Features from imerek.js UYAP_EXT.DB

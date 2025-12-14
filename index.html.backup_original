@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UYAP Desktop</title>
+    <script src="xhook.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: #f5f5f5;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            padding: 8px 16px;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 10px;
+            transition: background 0.3s;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        #main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        #sidebar {
+            width: 300px;
+            background: white;
+            border-right: 1px solid #ddd;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        #sidebar h3 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 18px;
+        }
+
+        .file-card {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            transition: all 0.3s;
+        }
+
+        .file-card:hover {
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .file-number {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+
+        .file-detail-item {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .file-status {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        #browser-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #status {
+            padding: 10px;
+            background: #fff3cd;
+            border-bottom: 1px solid #ffc107;
+            text-align: center;
+            font-size: 14px;
+            color: #856404;
+        }
+
+        /* Party Cards */
+        .party-section {
+            margin-top: 12px;
+            border-top: 1px solid #eee;
+            padding-top: 12px;
+            display: none;
+        }
+
+        .party-section.visible {
+            display: block;
+        }
+
+        .party-card {
+            background: #fff;
+            border-left: 4px solid #4CAF50;
+            border-radius: 6px;
+            padding: 8px;
+            margin: 6px 0;
+            font-size: 12px;
+        }
+
+        .party-card.davaci {
+            border-left-color: #2196F3;
+            background: #E3F2FD;
+        }
+
+        .party-card.davali {
+            border-left-color: #F44336;
+            background: #FFEBEE;
+        }
+
+        .party-card.vekil {
+            border-left-color: #9C27B0;
+            background: #F3E5F5;
+        }
+
+        .party-type {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-right: 6px;
+            color: white;
+        }
+
+        .party-type.davaci {
+            background: #2196F3;
+        }
+
+        .party-type.davali {
+            background: #F44336;
+        }
+
+        .party-type.vekil {
+            background: #9C27B0;
+        }
+
+        .btn-party {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            margin-top: 6px;
+            width: 100%;
+        }
+
+        .btn-party:hover {
+            background: #5568d3;
+        }
+
+        .btn-save {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            margin-top: 6px;
+            margin-right: 4px;
+        }
+
+        .btn-save:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <header>
+            <h1>🏛️ UYAP Desktop</h1>
+            <div>
+                <button class="btn" onclick="showSavedFiles()">💾 Kayıtlı Dosyalar</button>
+                <button class="btn" onclick="require('electron').ipcRenderer.send('open-devtools')">🔧 DevTools</button>
+                <button class="btn" onclick="document.getElementById('uyap-browser').reload()">🔄 Yenile</button>
+            </div>
+        </header>
+
+        <div id="status">
+            📡 UYAP'ta arama yaptığınızda dosyalar otomatik olarak burada görünecek
+        </div>
+
+        <div id="main">
+            <div id="sidebar">
+                <h3>📂 Dosyalar</h3>
+
+                <!-- Simple Search Section (New) -->
+                <div class="search-container"
+                    style="padding: 10px; background: white; margin-bottom: 10px; border-radius: 8px; border: 1px solid #eee;">
+                    <div style="display: flex; gap: 5px;">
+                        <input type="text" id="simpleSearchInput" placeholder="Dosya No..."
+                            style="flex: 1; padding: 6px; border: 1px solid #ddd; border-radius: 4px;">
+                        <button id="simpleSearchBtn" class="btn-party" style="margin:0;">Ara</button>
+                    </div>
+                </div>
+
+                <!-- Bulk Actions -->
+                <button id="bulkQueryBtn" class="btn-party"
+                    style="width:100%; margin-bottom:15px; background:#ff9800; font-size:13px; padding:8px;">🔄 Tümünü
+                    Sorgula</button>
+                <div id="bulkProgress"
+                    style="display:none; margin-bottom:10px; font-size:12px; color:#666; text-align:center;">
+                    Sorgulanıyor: <span id="bulkCount">0</span>/<span id="bulkTotal">0</span>
+                    <div style="width:100%; height:4px; background:#eee; margin-top:4px; border-radius:2px;">
+                        <div id="bulkBar"
+                            style="width:0%; height:100%; background:#ff9800; border-radius:2px; transition:width 0.3s;">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 10px; text-align: right;">
+                    <button class="btn-party" onclick="showDebugData()"
+                        style="background: #333; width: auto; font-size: 10px;">🐞 Debug Data</button>
+                </div>
+
+                <div id="file-list"></div>
+
+                <!-- Debug Modal -->
+                <div id="debugModal"
+                    style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:9000; justify-content:center; align-items:center;">
+                    <div
+                        style="background:white; width:80%; height:80%; padding:20px; border-radius:8px; display:flex; flex-direction:column;">
+                        <h3>🐞 Son Yakalanan Veri (Raw)</h3>
+                        <textarea id="debugOutput"
+                            style="flex:1; width:100%; font-family:monospace; margin:10px 0; padding:10px; border:1px solid #ccc;"></textarea>
+                        <div style="text-align:right;">
+                            <button onclick="document.getElementById('debugModal').style.display='none'"
+                                class="btn-party" style="background:#dc3545;">Kapat</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="browser-container">
+                <webview id="uyap-browser" src="https://avukatbeta.uyap.gov.tr/" partition="persist:uyap"></webview>
+            </div>
+        </div>
+        <!-- Documents Modal -->
+        <div id="docsModal"
+            style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:99999; justify-content:center; align-items:center;">
+            <div
+                style="background:white; width:90%; height:90%; display:flex; flex-direction:column; border-radius:8px; box-shadow:0 0 20px rgba(0,0,0,0.3); z-index:100000;">
+                <div
+                    style="padding:15px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; background:#f8f9fa; border-radius:8px 8px 0 0;">
+                    <h3 id="docsModalTitle">📂 Evraklar</h3>
+                    <button onclick="closeDocsModal()"
+                        style="border:none; background:none; font-size:24px; cursor:pointer;">&times;</button>
+                </div>
+                <div id="docsList" style="flex:1; overflow-y:auto; padding:20px;">
+                    <div style="text-align:center; padding:20px; color:#666;">Yükleniyor...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+    </div>
+
+    <script>
+        const UYAPApi = require('./uyap-api');
+        const UYAPDownloader = require('./uyap-downloader');
+        const { ipcRenderer } = require('electron');
+        const webview = document.getElementById('uyap-browser');
+        const fileList = document.getElementById('file-list');
+        const status = document.getElementById('status');
+
+        // Initialize API immediately (IPC Mode)
+        const uyapApi = new UYAPApi();
+        window.downloader = new UYAPDownloader(uyapApi); // Init global downloader
+        console.log('✅ UYAP API & Downloader Initialized (IPC Mode)');
+
+        webview.addEventListener('dom-ready', () => console.log('✅ Webview DOM Ready'));
+
+        // Simple Search Listener
+        const searchBtn = document.getElementById('simpleSearchBtn');
+        if (searchBtn) {
+            searchBtn.addEventListener('click', async () => {
+                const query = document.getElementById('simpleSearchInput').value;
+                if (query) {
+                    console.log('Searching via API:', query);
+                }
+            });
+        }
+
+        // Bulk Query Logic
+        const bulkBtn = document.getElementById('bulkQueryBtn');
+        const bulkProgress = document.getElementById('bulkProgress');
+        const bulkCount = document.getElementById('bulkCount');
+        const bulkTotal = document.getElementById('bulkTotal');
+        const bulkBar = document.getElementById('bulkBar');
+
+        if (bulkBtn) {
+            bulkBtn.addEventListener('click', async () => {
+                const files = [...currentFilesMap.values()];
+                if (files.length === 0) {
+                    alert('Listede dosya yok! Lütfen önce UYAP üzerinden bir dosya listesi görüntüleyin.');
+                    return;
+                }
+
+                if (!confirm(`${files.length} dosya için taraf sorgulaması yapılacak. Bu işlem sırayla yapılacağı için biraz sürebilir. Devam edilsin mi?`)) return;
+
+                // UI Setup
+                bulkBtn.disabled = true;
+                bulkBtn.textContent = '⏳ İşleniyor...';
+                bulkProgress.style.display = 'block';
+                bulkTotal.textContent = files.length;
+                let processed = 0;
+
+                // Process Queue
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    processed = i + 1;
+
+                    // Update Progress
+                    bulkCount.textContent = processed;
+                    bulkBar.style.width = `${(processed / files.length) * 100}%`;
+
+                    try {
+                        // 1. Fetch
+                        if (uyapApi) {
+                            console.log(`Bulk processing [${i + 1}/${files.length}]: ${file.dosyaNo}`);
+
+                            // Optional: Highlight current card (Safe lookup)
+                            const currentCard = document.getElementById(`file-card-${file.dosyaId}`);
+                            if (currentCard) currentCard.style.borderLeft = "4px solid #ff9800"; // Processing
+
+                            // Check cache
+                            if (file.parties && file.parties.length > 0) {
+                                if (currentCard) {
+                                    currentCard.style.borderLeft = "4px solid #4CAF50";
+                                    if (!currentCard.querySelector('.loaded-indicator')) {
+                                        const ind = document.createElement('span');
+                                        ind.className = 'loaded-indicator';
+                                        ind.textContent = ' ✅';
+                                        currentCard.querySelector('.file-number')?.appendChild(ind);
+                                    }
+                                }
+                                continue;
+                            }
+
+                            // 1. Get Parties
+                            // Pass FULL file object so API has access to birimId, etc.
+                            const response = await uyapApi.getParties(file);
+
+                            if (response && response.data) {
+                                let parties = [];
+                                if (Array.isArray(response.data)) {
+                                    parties = response.data;
+                                } else if (response.data.tarafListesi) {
+                                    parties = response.data.tarafListesi;
+                                }
+
+                                if (parties.length > 0) {
+                                    // Update State
+                                    file.parties = parties;
+                                    currentFilesMap.set(file.dosyaId, file);
+
+                                    // Update UI if card exists
+                                    renderParties(file.dosyaId, parties);
+
+                                    // Success Visuals
+                                    if (currentCard) {
+                                        currentCard.style.borderLeft = "4px solid #4CAF50";
+                                        if (!currentCard.querySelector('.loaded-indicator')) {
+                                            const ind = document.createElement('span');
+                                            ind.className = 'loaded-indicator';
+                                            ind.textContent = ' ✅';
+                                            currentCard.querySelector('.file-number')?.appendChild(ind);
+                                        }
+                                    }
+
+                                    // Save to DB (Silent)
+                                    if (window.saveFile && db) await db.saveFile(file);
+                                }
+                            }
+
+                            // Reset border if failed or no parties found
+                            if (currentCard && (!file.parties || file.parties.length === 0)) {
+                                currentCard.style.borderLeft = "";
+                            }
+                        }
+
+                        // 2. Safe Random Delay ( ~4s )
+                        const delayMs = 3500 + Math.random() * 1500;
+                        console.log(`⏳ Bekleniyor: ${Math.round(delayMs / 1000)}s`);
+                        await new Promise(r => setTimeout(r, delayMs));
+
+                    } catch (err) {
+                        console.error(`Bulk error for ${file.dosyaNo}:`, err);
+                    }
+                }
+
+                // Finish
+                bulkBtn.disabled = false;
+                bulkBtn.textContent = '🔄 Tümünü Sorgula';
+                setTimeout(() => bulkProgress.style.display = 'none', 3000);
+                alert('✅ Tüm sorgulamalar tamamlandı!');
+            });
+        }
+
+        // Global State for Files
+        let currentFilesMap = new Map();
+
+        // IPC: Generic Debug Data (Catch-all)
+        ipcRenderer.on('uyap-debug-data', (event, packet) => {
+            // packet = { url, data }
+            console.log('🕷️ Debug Data:', packet.url);
+            lastCapturedData = packet; // Save everything so user sees it in modal
+
+            // Visual feedback that we are alive
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = '📡 Veri: ' + packet.url.split('/').pop().substring(0, 30);
+            statusEl.style.background = '#e2e3e5';
+        });
+
+        console.log('✅ UYAP Desktop minimal yüklendi');
+
+        // IPC: UYAP Data Captured (File List)
+        let lastCapturedData = null; // Store for debug
+
+        window.showDebugData = function () {
+            const el = document.getElementById('debugOutput');
+            const modal = document.getElementById('debugModal');
+            if (el && modal) {
+                el.value = lastCapturedData ? JSON.stringify(lastCapturedData, null, 2) : 'Henüz veri yakalanmadı.';
+                modal.style.display = 'flex';
+            }
+        };
+
+        // Listen for the NEW relay event
+        ipcRenderer.on('uyap-files-ready', (event, packet) => {
+            console.log('📡 Dosya Verisi Hazır:', packet);
+            lastCapturedData = packet; // Save for debug
+
+            // Auto-update debug view if open
+            if (document.getElementById('debugModal').style.display !== 'none') {
+                window.showDebugData();
+            }
+
+            try {
+                // Packet structure: { files: [...], count: 123, source: '...' }
+                let files = packet.files || [];
+
+                // Fallback for legacy format if mixed
+                if (!packet.files && Array.isArray(packet)) {
+                    if (Array.isArray(packet[0])) files = packet[0];
+                    else files = packet;
+                }
+
+                if (files.length === 0) {
+                    status.textContent = '⚠️ Veri alındı ama dosya listesi boş';
+                    status.style.background = '#fff3cd';
+                    return;
+                }
+
+                console.log('📋 Dosya sayısı:', files.length);
+
+                if (files.length === 0) {
+                    status.textContent = '⚠️ Veri alındı ama dosya bulunamadı';
+                    status.style.background = '#fff3cd';
+                    return;
+                }
+
+                // 1. Update Global State with New Data
+                files.forEach((file, index) => {
+                    // Fallback ID if missing
+                    if (!file.dosyaId && !file.dosyaNo) {
+                        console.warn(`⚠️ Dosya ${index} ID'siz, geçici ID atanıyor`);
+                        file.dosyaId = 'temp-' + Date.now() + '-' + index;
+                    }
+                    const fileId = file.dosyaId || file.dosyaNo;
+
+                    if (fileId) {
+                        const existing = currentFilesMap.get(fileId);
+                        currentFilesMap.set(fileId, { ...file, parties: existing ? existing.parties : [] });
+                    }
+                });
+
+                // 2. Render ALL Files from State
+                const allFiles = [...currentFilesMap.values()];
+                status.textContent = `✅ Toplam ${allFiles.length} dosya hafızada`;
+                status.style.background = '#d4edda';
+
+                fileList.innerHTML = ''; // Clear visual list
+
+                allFiles.forEach(file => {
+                    const card = document.createElement('div');
+                    card.className = 'file-card';
+                    card.id = `file-card-${file.dosyaId}`;
+                    card.dataset.dosyaId = file.dosyaId || '';
+
+                    const dosyaNo = file.dosyaNo || file.dosyaNumarasi || 'Dosya No Yok';
+                    const birimAdi = file.birimAdi || file.mahkeme || 'Birim Yok';
+                    const dosyaDurum = file.dosyaDurum || file.durum || '';
+
+                    card.innerHTML = `
+                        <div class="file-number">${dosyaNo}</div>
+                        ${dosyaDurum ? `<div class="file-status">${dosyaDurum}</div>` : ''}
+                        <div class="file-detail-item"><strong>Birim:</strong> ${birimAdi}</div>
+                        
+                        <div style="display:flex; gap:5px; margin-top:5px;">
+                            <button class="btn-party" onclick="toggleParties('${file.dosyaId}')" style="flex:1;">👥 Taraflar</button>
+                            <button class="btn-party" onclick="showDocuments('${file.dosyaId}')" style="flex:1; background:#17a2b8;">📄 Evraklar</button>
+                        </div>
+                        <button class="btn-save" onclick='saveFile("${file.dosyaId}")'>💾</button>
+
+                        <div class="party-section" id="party-${file.dosyaId}">
+                            ${file.parties && file.parties.length > 0 ? `<div style="color:green; font-size:12px;">✅ ${file.parties.length} taraf yüklü</div>` : ''}
+                        </div>
+                    `;
+
+                    fileList.appendChild(card);
+                });
+
+                console.log('✅ Tüm kartlar güncellendi:', allFiles.length);
+
+            } catch (error) {
+                console.error('❌ Veri işleme hatası:', error);
+                status.textContent = '❌ Veri işlenirken hata oluştu: ' + error.message;
+                status.style.background = '#f8d7da';
+            }
+        });
+
+        // Document Handler (Enhanced with getAllEvrak)
+        window.showDocuments = async function (dosyaId) {
+            const modal = document.getElementById('docsModal');
+            const listEl = document.getElementById('docsList');
+            const titleEl = document.getElementById('docsModalTitle');
+            const webview = document.getElementById('uyap-browser');
+            let webviewParent = null;
+            let webviewHTML = null;
+
+            // 1. UI Setup - Webview'ı DOM'dan tamamen kaldır (Electron webview z-index sorunu)
+            modal.style.display = 'flex';
+            if (webview) {
+                webviewParent = webview.parentElement;
+                webviewHTML = webview.outerHTML;
+                webview.remove();  // DOM'dan kaldır
+                console.log('🗑️ Webview DOM\'dan kaldırıldı');
+            }
+
+            // Get File Info for nice title
+            const file = currentFilesMap.get(dosyaId);
+            const displayName = file ? `${file.dosyaNo} - ${file.birimAdi}` : dosyaId;
+            titleEl.textContent = `📂 Evraklar: ${displayName}`;
+
+            listEl.innerHTML = '<div style="text-align:center; padding:40px;"><div style="font-size:24px;">⏳</div><br>Evrak listesi UYAP\'tan çekiliyor...<br><small style="color:#666;">Tüm sayfalar toplanıyor (Gelen, Giden, Diğer)</small></div>';
+
+            try {
+                // Fetch ALL Evrak with pagination and categorization
+                console.log(`📄 Tüm evraklar alınıyor: ${dosyaId}`);
+                const evrakData = await uyapApi.getAllEvrak(dosyaId);
+                console.log('Evrak Data:', evrakData);
+
+                const totalCount = evrakData.all.length;
+
+                if (totalCount === 0) {
+                    listEl.innerHTML = `<div style="text-align:center; color:#dc3545; padding:20px;">
+                        <h3>📭 Evrak Bulunamadı</h3>
+                        <p>Bu dosyada henüz evrak bulunmuyor.</p>
+                     </div>`;
+                    return;
+                }
+
+                // Build Categorized View
+                let html = `
+                    <div style="margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+                        <div style="font-size:14px; color:#666;">
+                            📊 Toplam: <strong>${totalCount}</strong> evrak 
+                            (Gelen: ${evrakData.gelen.length}, Giden: ${evrakData.giden.length}, Diğer: ${evrakData.diger.length})
+                        </div>
+                        <button id="btnDownloadAll" class="btn-party" style="background:#007bff; color:white; width:auto; padding:6px 12px;">
+                            📥 Tümünü İndir (${totalCount})
+                        </button>
+                    </div>
+                    
+                    <!-- Category Tabs -->
+                    <div style="display:flex; gap:10px; margin-bottom:15px; border-bottom:2px solid #eee;">
+                        <button class="evrak-tab active" data-category="all" style="flex:1; padding:10px; border:none; background:#667eea; color:white; cursor:pointer; border-radius:5px 5px 0 0;">
+                            Tümü (${totalCount})
+                        </button>
+                        <button class="evrak-tab" data-category="gelen" style="flex:1; padding:10px; border:none; background:#f0f0f0; color:#333; cursor:pointer; border-radius:5px 5px 0 0;">
+                            📥 Gelen (${evrakData.gelen.length})
+                        </button>
+                        <button class="evrak-tab" data-category="giden" style="flex:1; padding:10px; border:none; background:#f0f0f0; color:#333; cursor:pointer; border-radius:5px 5px 0 0;">
+                            📤 Giden (${evrakData.giden.length})
+                        </button>
+                        <button class="evrak-tab" data-category="diger" style="flex:1; padding:10px; border:none; background:#f0f0f0; color:#333; cursor:pointer; border-radius:5px 5px 0 0;">
+                            📋 Diğer (${evrakData.diger.length})
+                        </button>
+                    </div>
+                `;
+
+                // Function to render evrak table
+                const renderEvrakTable = (docs, category) => {
+                    if (docs.length === 0) {
+                        return `<div style="text-align:center; padding:20px; color:#999;">Bu kategoride evrak yok</div>`;
+                    }
+
+                    let tableHtml = '<table style="width:100%; border-collapse:collapse; font-size:13px;">';
+                    tableHtml += '<tr style="background:#eee; text-align:left;"><th style="padding:10px;">Tarih</th><th style="padding:10px;">Evrak Türü</th><th style="padding:10px;">Açıklama</th><th style="padding:10px; width:100px;">İşlem</th></tr>';
+
+                    docs.forEach(doc => {
+                        const tarih = doc.evrakTarih || doc.tarih || 'Tarih Yok';
+                        const tur = doc.evrakTur || doc.evrakTuru || doc.tur || 'Bilinmiyor';
+                        const aciklama = doc.evrakAciklama || doc.aciklama || '';
+                        const docId = doc.evrakId || doc.id;
+
+                        // Metadata for downloader
+                        const meta = {
+                            id: docId,
+                            name: `${tur} - ${tarih}`,
+                            type: 'evrak',
+                            dosyaId: dosyaId,
+                            evrakId: docId
+                        };
+                        const metaStr = JSON.stringify(meta).replace(/"/g, "&quot;");
+
+                        tableHtml += `
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:10px;">${tarih}</td>
+                                <td style="padding:10px; font-weight:600; color:#333;">${tur}</td>
+                                <td style="padding:10px; color:#555;">${aciklama}</td>
+                                <td style="padding:10px;">
+                                    <button class="btn-party" onclick='window.downloader.addToQueue(${metaStr})' 
+                                        style="background:#28a745; padding:6px 10px; width:100%;">
+                                        ⬇️ İndir
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    tableHtml += '</table>';
+                    return tableHtml;
+                };
+
+                // Render all categories (hidden by default except 'all')
+                html += `
+                    <div class="evrak-content" data-category="all" style="display:block;">
+                        ${renderEvrakTable(evrakData.all, 'all')}
+                    </div>
+                    <div class="evrak-content" data-category="gelen" style="display:none;">
+                        ${renderEvrakTable(evrakData.gelen, 'gelen')}
+                    </div>
+                    <div class="evrak-content" data-category="giden" style="display:none;">
+                        ${renderEvrakTable(evrakData.giden, 'giden')}
+                    </div>
+                    <div class="evrak-content" data-category="diger" style="display:none;">
+                        ${renderEvrakTable(evrakData.diger, 'diger')}
+                    </div>
+                `;
+
+                listEl.innerHTML = html;
+
+                // Tab switching logic
+                document.querySelectorAll('.evrak-tab').forEach(tab => {
+                    tab.onclick = function () {
+                        const category = this.dataset.category;
+
+                        // Update tab styles
+                        document.querySelectorAll('.evrak-tab').forEach(t => {
+                            t.style.background = '#f0f0f0';
+                            t.style.color = '#333';
+                        });
+                        this.style.background = '#667eea';
+                        this.style.color = 'white';
+
+                        // Show/hide content
+                        document.querySelectorAll('.evrak-content').forEach(content => {
+                            content.style.display = content.dataset.category === category ? 'block' : 'none';
+                        });
+                    };
+                });
+
+                // Bind Bulk Download (downloads ALL evrak regardless of active tab)
+                document.getElementById('btnDownloadAll').onclick = () => {
+                    if (!confirm(`${totalCount} adet evrak indirme kuyruğuna eklenecek. Onaylıyor musunuz?`)) return;
+
+                    let count = 0;
+                    evrakData.all.forEach(doc => {
+                        const docId = doc.evrakId || doc.id;
+                        window.downloader.addToQueue({
+                            id: docId,
+                            name: `${doc.evrakTur || doc.tur} - ${doc.evrakTarih || doc.tarih}`,
+                            type: 'evrak',
+                            dosyaId: dosyaId,
+                            evrakId: docId
+                        });
+                        count++;
+                    });
+
+                    window.downloader.showToast(`✅ ${count} Evrak kuyruğa eklendi!`, 'success');
+                };
+
+            } catch (e) {
+                console.error('Evrak listeleme hatası:', e);
+                listEl.innerHTML = `<div style="text-align:center; color:red; padding:20px;">
+                    <h3>❌ Hata Oluştu</h3>
+                    <p>${e.message}</p>
+                    <small style="color:#666;">Session süresi dolmuş olabilir. Lütfen UYAP'ta tekrar login olun.</small>
+                 </div>`;
+            }
+        };
+
+        // Modal Close Handler
+        window.closeDocsModal = function () {
+            const modal = document.getElementById('docsModal');
+            const webview = document.getElementById('uyap-browser');
+            modal.style.display = 'none';
+            if (webview) {
+                webview.style.display = 'block';  // Geri getir
+                webview.style.visibility = 'visible';
+                webview.style.pointerEvents = 'auto';
+            }
+        };
+
+        // IPC: Party Data Received
+        ipcRenderer.on('party-data-received', (event, packet) => {
+            console.log('👥 Taraf verisi alındı:', packet);
+
+            if (!packet.dosyaId || !packet.parties) {
+                console.warn('⚠️ Eksik taraf verisi');
+                return;
+            }
+
+            // Find matching file card
+            const card = document.querySelector(`[data-dosya-id="${packet.dosyaId}"]`);
+            if (!card) {
+                console.warn('⚠️ Eşleşen dosya kartı bulunamadı:', packet.dosyaId);
+                return;
+            }
+
+            // Get party section (Use getElementById as dosyaId has special chars)
+            const partySection = document.getElementById(`party-${packet.dosyaId}`);
+            if (!partySection) {
+                console.warn('⚠️ Party section bulunamadı');
+                return;
+            }
+
+            // Parse parties
+            const parties = Array.isArray(packet.parties) ? packet.parties : packet.parties.data || [];
+
+            if (parties.length === 0) {
+                partySection.innerHTML = '<div style="text-align:center; color:#888; padding:10px;">👤 Taraf bilgisi bulunamadı</div>';
+                return;
+            }
+
+            // Update global state
+            if (currentFilesMap.has(packet.dosyaId)) {
+                const file = currentFilesMap.get(packet.dosyaId);
+                file.parties = parties;
+                currentFilesMap.set(packet.dosyaId, file);
+                console.log(`💾 State güncellendi: ${packet.dosyaId} için ${parties.length} taraf`);
+            }
+
+            // Render parties
+            let html = '';
+            parties.forEach(party => {
+                // Name Resolution
+                const name = party.adi || (party.ad && party.soyad ? `${party.ad} ${party.soyad} ` : null) || party.kisiKurumAdi || 'İsimsiz';
+
+                // Role Resolution
+                // Prioritize explicit role name, then type code
+                const role = party.sifatAdi || party.tarafSifat || party.sifat || party.rolTur || 'Taraf';
+
+                // Attorney Resolution
+                let attorneyInfo = '';
+                if (party.vekilListesi && party.vekilListesi.length > 0) {
+                    attorneyInfo = `<div class="attorney-info" style="font-size:11px; color:#666; margin-top:2px;">
+                        ⚖️ Vekil: ${party.vekilListesi.map(v => v.adi || v.adSoyad || 'Av. ?').join(', ')}
+                    </div>`;
+                }
+
+                // Determine CSS Class based on Role
+                let typeClass = 'diger';
+                const roleLower = role.toLowerCase();
+                if (roleLower.includes('davacı') || roleLower.includes('alacaklı') || roleLower.includes('şikayetçi')) {
+                    typeClass = 'davaci';
+                } else if (roleLower.includes('davalı') || roleLower.includes('sanık') || roleLower.includes('borçlu')) {
+                    typeClass = 'davali';
+                } else if (roleLower.includes('vekil') || roleLower.includes('müdafi')) {
+                    typeClass = 'vekil';
+                }
+
+                html += `
+                    <div class="party-card ${typeClass}" style="display:flex; flex-direction:column; gap:2px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <strong>${name}</strong>
+                            <span class="party-type ${typeClass}">${role}</span>
+                        </div>
+                        ${attorneyInfo}
+                    </div>
+                `;
+            });
+
+            partySection.innerHTML = html;
+            console.log(`✅ ${parties.length} taraf gösterildi`);
+        });
+
+        // Toggle parties visibility
+        window.toggleParties = async function (dosyaId) {
+            const section = document.getElementById(`party-${dosyaId}`);
+            // Fix: remove spaces in selector
+            const button = document.querySelector(`button[onclick*="${dosyaId}"]`);
+
+            if (!section) return;
+
+            if (section.style.display === 'block') {
+                section.style.display = 'none';
+                if (button) button.textContent = '👥 Tarafları Göster';
+                return;
+            }
+
+            section.style.display = 'block';
+            if (button) button.textContent = '👥 Tarafları Gizle';
+
+            console.log(`👥 Taraflar isteniyor: ${dosyaId}`);
+
+            // Check local state first
+            // Ensure we are reading the latest object ref from the map
+            // Map keys are strings in our logic, matching dosyaId
+            if (currentFilesMap.has(dosyaId)) {
+                const file = currentFilesMap.get(dosyaId);
+                // Check for parties array existence and length
+                if (file.parties && Array.isArray(file.parties) && file.parties.length > 0) {
+                    console.log('📦 Taraflar önbellekten yüklendi');
+                    renderParties(dosyaId, file.parties);
+                    return;
+                }
+            }
+
+            // Fetch from UYAP via Direct API
+            // Robust initialization check
+            if (!uyapApi) {
+                console.warn('⚠️ uyapApi was null, re-initializing...');
+                uyapApi = new UYAPApi();
+            }
+
+            if (uyapApi) {
+                section.innerHTML = '<div style="text-align:center; padding:10px;">⏳ Taraf bilgisi (API)...</div>';
+
+                try {
+                    const response = await uyapApi.getParties(dosyaId);
+                    console.log('API Response for Parties:', response);
+
+                    let parties = [];
+                    if (response && response.data) {
+                        if (Array.isArray(response.data)) {
+                            parties = response.data;
+                        } else if (response.data.tarafListesi) {
+                            parties = response.data.tarafListesi;
+                        }
+                    }
+
+                    if (parties.length > 0) {
+                        // Update state
+                        if (currentFilesMap.has(dosyaId)) {
+                            const file = currentFilesMap.get(dosyaId);
+                            file.parties = parties;
+                            currentFilesMap.set(dosyaId, file);
+                        }
+
+                        // Render
+                        renderParties(dosyaId, parties);
+
+                        // Auto-save to DB if needed
+                        if (window.saveFile) window.saveFile(dosyaId);
+
+                    } else {
+                        section.innerHTML = '<div style="text-align:center; color:red; padding:10px;">⚠️ Taraf bulunamadı.</div>';
+                    }
+
+                } catch (err) {
+                    console.error('Taraf getirme hatası:', err);
+                    section.innerHTML = `<div style="text-align:center; color:red; padding:10px;">❌ Hata: ${err.message}</div>`;
+                }
+            } else {
+                section.innerHTML = '<div style="text-align:center; color:red; padding:10px;">⚠️ API Başlatılamadı (Webview yok).</div>';
+            }
+        };
+
+        // Global Render Helper
+        window.renderParties = function (dosyaId, parties) {
+            const partySection = document.getElementById(`party-${dosyaId}`);
+            if (!partySection) return;
+
+            let html = '';
+            parties.forEach(party => {
+                // Name
+                const name = party.adi || (party.ad && party.soyad ? `${party.ad} ${party.soyad} ` : null) || party.kisiKurumAdi || 'İsimsiz';
+
+                // Role
+                const role = party.sifatAdi || party.tarafSifat || party.sifat || party.rolTur || 'Taraf';
+
+                // Attorney
+                let attorneyInfo = '';
+                if (party.vekilListesi && party.vekilListesi.length > 0) {
+                    attorneyInfo = `<div class="attorney-info" style="font-size:11px; color:#666; margin-top:2px; margin-left:10px;">
+                        ↳ ⚖️ Vekil: ${party.vekilListesi.map(v => v.adi || v.adSoyad || 'Av. ?').join(', ')}
+                    </div>`;
+                }
+
+                // CSS Class
+                let typeClass = 'diger';
+                const roleLower = role.toLowerCase();
+                if (roleLower.includes('davacı') || roleLower.includes('alacaklı') || roleLower.includes('şikayetçi')) {
+                    typeClass = 'davaci';
+                } else if (roleLower.includes('davalı') || roleLower.includes('sanık') || roleLower.includes('borçlu')) {
+                    typeClass = 'davali';
+                } else if (roleLower.includes('vekil') || roleLower.includes('müdafi')) {
+                    typeClass = 'vekil';
+                }
+
+                html += `
+                    <div class="party-card ${typeClass}" style="padding: 6px; border-bottom:1px solid #eee;">
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="font-weight:600;">${name}</span>
+                            <span class="party-type ${typeClass}" style="font-size:11px; padding:2px 6px; border-radius:4px;">${role}</span>
+                        </div>
+                        ${attorneyInfo}
+                    </div>
+                `;
+            });
+
+            partySection.innerHTML = html;
+            partySection.style.display = 'block'; // Auto show
+        };
+
+        console.log('✅ IPC listeners hazır');
+
+        // ===== DATABASE FUNCTIONS =====
+
+        // Initialize database on load
+        let db = null;
+        (async () => {
+            db = await initDatabase();
+        })();
+
+        // Save file to database
+        window.saveFile = async function (fileId) {
+            if (!db) {
+                alert('❌ Veritabanı hazır değil');
+                return;
+            }
+
+            const fileData = currentFilesMap.get(fileId);
+            if (!fileData) {
+                alert('❌ Dosya verisi bulunamadı!');
+                return;
+            }
+
+            try {
+                await db.saveFile(fileData);
+                alert(`✅ "${fileData.dosyaNo}" kaydedildi`);
+            } catch (error) {
+                console.error('❌ Kayıt hatası:', error);
+                alert('❌ Kayıt başarısız: ' + error.message);
+            }
+        };
+
+        // Show saved files panel
+        window.showSavedFiles = async function () {
+            if (!db) {
+                alert('❌ Veritabanı hazır değil');
+                return;
+            }
+
+            try {
+                const files = await db.getAllFiles();
+                const stats = await db.getStats();
+
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0,0,0,0.7);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 10000;
+                `;
+
+                let fileListHTML = '';
+                files.forEach(file => {
+                    fileListHTML += `
+                        <div style="background:#f9f9f9; padding:10px; margin:8px 0; border-radius:5px; border-left:4px solid #28a745;">
+                            <strong>${file.dosyaNo || 'N/A'}</strong><br>
+                            <small>${file.birimAdi || ''}</small><br>
+                            <small>Kayıt: ${new Date(file.kayitTarihi).toLocaleDateString('tr-TR')}</small>
+                            <button onclick="deleteFromDB(${file.id})" style="float:right; background:#dc3545; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">🗑️ Sil</button>
+                        </div>
+                    `;
+                });
+
+                modal.innerHTML = `
+                    <div style="background:white; border-radius:10px; padding:20px; max-width:600px; max-height:80vh; overflow:auto; width:90%;">
+                        <h2>💾 Kayıtlı Dosyalar</h2>
+                        <div style="background:#e8f4fd; padding:10px; border-radius:5px; margin:10px 0;">
+                            <strong>📊 İstatistikler:</strong><br>
+                            Toplam: ${stats.total} | Açık: ${stats.acik} | Kapalı: ${stats.kapali}
+                        </div>
+                        <div style="max-height:400px; overflow-y:auto;">
+                            ${files.length > 0 ? fileListHTML : '<p style="text-align:center; color:#888;">📭 Kayıtlı dosya yok</p>'}
+                        </div>
+                        <button onclick="this.closest('div').parentElement.remove()" style="margin-top:15px; background:#667eea; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; width:100%;">Kapat</button>
+                    </div>
+                `;
+
+                document.body.appendChild(modal);
+            } catch (error) {
+                console.error('❌ Dosya listesi hatası:', error);
+                alert('❌ Kayıtlı dosyalar yüklenemedi');
+            }
+        };
+
+        // Delete from database
+        window.deleteFromDB = async function (fileId) {
+            if (!db) return;
+
+            if (confirm('Bu dosyayı silmek istediğinize emin misiniz?')) {
+                try {
+                    await db.deleteFile(fileId);
+                    alert('✅ Dosya silindi');
+                    // Refresh the modal
+                    document.querySelector('[style*="rgba(0,0,0,0.7)"]')?.remove();
+                    showSavedFiles();
+                } catch (error) {
+                    console.error('❌ Silme hatası:', error);
+                    alert('❌ Silme başarısız');
+                }
+            }
+        };
+
+        // XHook Status Listener
+        ipcRenderer.on('update-xhook-status', (event, statusMsg) => {
+            console.log('XHook Status Update:', statusMsg);
+            const statusEl = document.getElementById('status');
+            if (statusMsg.includes('Hata')) {
+                statusEl.textContent = '❌ ' + statusMsg;
+                statusEl.style.background = '#f8d7da';
+            } else {
+                statusEl.textContent = '📡 Sistem Hazır (' + statusMsg + ')';
+                statusEl.style.background = '#d4edda';
+            }
+        });
+
+        // XHook Traffic Listener
+        ipcRenderer.on('update-last-url', (event, url) => {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = '📡 İşlem: ' + url.substring(0, 50) + '...';
+            // Flash effect
+            statusEl.style.background = '#fff3cd';
+            setTimeout(() => statusEl.style.background = '#d4edda', 500);
+        });
+
+        console.log('✅ Database functions hazır');
+    </script>
+</body>
+
+</html>

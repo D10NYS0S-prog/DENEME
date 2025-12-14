@@ -277,3 +277,76 @@ ipcMain.on('uyap-debug-data', (event, data) => {
         mainWindow.webContents.send('uyap-debug-data', data);
     }
 });
+
+// ============================================================================
+// NOTE OPERATIONS (Stage 2)
+// ============================================================================
+
+// Simple in-memory storage for Stage 2 demo
+// In production, this should use the database (db.js)
+let notesStore = [];
+
+ipcMain.handle('get-all-notes', async () => {
+    console.log('📝 Tüm notlar istendi, döndürülüyor:', notesStore.length);
+    return notesStore;
+});
+
+ipcMain.handle('save-note', async (event, { kaynakId, noteText, noteType }) => {
+    const note = {
+        id: Date.now().toString(),
+        kaynakId: kaynakId,
+        icerik: noteText,
+        type: noteType || 'genel',
+        tarih: new Date().toISOString(),
+        kullanici: 'current-user'
+    };
+    
+    notesStore.push(note);
+    console.log('✅ Not kaydedildi:', note.id);
+    
+    return { success: true, note };
+});
+
+ipcMain.handle('get-notes', async (event, { kaynakId, noteType, limit }) => {
+    let filtered = notesStore;
+    
+    if (kaynakId) {
+        filtered = filtered.filter(n => n.kaynakId === kaynakId);
+    }
+    
+    if (noteType) {
+        filtered = filtered.filter(n => n.type === noteType);
+    }
+    
+    if (limit) {
+        filtered = filtered.slice(0, limit);
+    }
+    
+    console.log(`📝 ${filtered.length} not döndürüldü`);
+    return filtered;
+});
+
+ipcMain.handle('delete-note', async (event, noteId) => {
+    const index = notesStore.findIndex(n => n.id === noteId);
+    if (index !== -1) {
+        notesStore.splice(index, 1);
+        console.log('✅ Not silindi:', noteId);
+        return { success: true };
+    }
+    
+    console.warn('⚠️ Not bulunamadı:', noteId);
+    return { error: 'Not bulunamadı' };
+});
+
+// Google Authorization Handler
+ipcMain.on('google-authorize', () => {
+    console.log('🔐 Google yetkilendirme istendi');
+    // TODO: Implement OAuth flow
+    // For now, show a dialog
+    const { dialog } = require('electron');
+    dialog.showMessageBox({
+        type: 'info',
+        title: 'Google Yetkilendirme',
+        message: 'Google OAuth akışı henüz implement edilmemiştir.\n\nBu özellik için Google Cloud Console\'da OAuth 2.0 kimlik bilgileri oluşturmanız gerekir.'
+    });
+});
