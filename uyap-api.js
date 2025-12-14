@@ -499,9 +499,7 @@ class UYAPApi {
     }
 }
 
-// Export
-if (typeof module !== 'undefined') module.exports = UYAPApi;
-// Export for use in renderer process (index.html)
+// Export for use in renderer process (index.html) and other modules
 if (typeof module !== 'undefined') {
     module.exports = UYAPApi;
 }
