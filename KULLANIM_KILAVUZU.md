@@ -14,8 +14,13 @@ npm install
 
 ### 2. Uygulamayı Çalıştırma
 
-Uygulamayı başlatmak için:
+**Windows Kullanıcıları için (Kolay Yöntem):**
+```batch
+start.bat
+```
+Veya `start.bat` dosyasına çift tıklayın.
 
+**Komut Satırı:**
 ```bash
 npm start
 ```
@@ -25,6 +30,24 @@ veya geliştirme modunda:
 ```bash
 npm run dev
 ```
+
+## ⚠️ Önemli Notlar
+
+**800A03EA Sözdizimi Hatası Alıyorsanız:**
+
+Bu hata genellikle şu durumlarda oluşur:
+1. `.js` dosyalarına direkt çift tıklayarak çalıştırmaya çalışıyorsanız
+2. Windows Script Host (WSH) ile çalıştırmaya çalışıyorsanız
+
+**Çözüm:**
+- ❌ `electron.js` veya `uyap-api.js` dosyalarına çift tıklamayın
+- ✅ `start.bat` dosyasını kullanın veya komut satırında `npm start` yazın
+- ✅ Electron uygulaması Node.js ile çalışmalıdır, WSH ile değil
+
+**Dosyaları Doğrudan Çalıştırmayın:**
+- `uyap-api.js` → Bu bir modül dosyasıdır, direkt çalıştırılamaz
+- `electron.js` → Bu Electron'un ana dosyasıdır, `npm start` ile çalıştırılmalıdır
+- `index.html` → Bu dosyayı tarayıcıda açmayın, Electron içinde çalışır
 
 ## 📖 Temel Kullanım
 
