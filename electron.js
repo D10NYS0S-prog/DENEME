@@ -350,3 +350,43 @@ ipcMain.on('google-authorize', () => {
         message: 'Google OAuth akışı henüz implement edilmemiştir.\n\nBu özellik için Google Cloud Console\'da OAuth 2.0 kimlik bilgileri oluşturmanız gerekir.'
     });
 });
+
+// PTT Status Check Handler (Stage 3)
+ipcMain.handle('check-ptt-status', async (event, { barkodNo, index, total }) => {
+    console.log(`📮 PTT durumu kontrol ediliyor: ${barkodNo} (${index + 1}/${total})`);
+    
+    // Simulate PTT API call (in production, this would call actual PTT Kargo API)
+    // PTT Kargo API documentation: https://gonderitakip.ptt.gov.tr/
+    
+    try {
+        // Simulated response - in production, use actual PTT API
+        // Example: const response = await axios.get(`https://gonderitakip.ptt.gov.tr/Track/Quicktrack?q=${barkodNo}`);
+        
+        // For now, return a simulated successful response
+        const mockStatuses = [
+            { id: 2, durum: 'TESLİM EDİLDİ', teslimTarihi: new Date().toISOString() },
+            { id: 1, durum: 'TESLİM EDİLEMEDİ', aciklama: 'Adres bulunamadı' },
+            { id: 0, durum: 'DAĞITIMDA', aciklama: 'Şubede' }
+        ];
+        
+        const randomStatus = mockStatuses[Math.floor(Math.random() * mockStatuses.length)];
+        
+        console.log(`✅ PTT durumu: ${randomStatus.durum}`);
+        
+        return {
+            isLastState: randomStatus.id,
+            durum: randomStatus.durum,
+            lastStateTarihi: randomStatus.teslimTarihi || new Date().toISOString(),
+            aciklama: randomStatus.aciklama || '',
+            barkodNo: barkodNo
+        };
+        
+    } catch (error) {
+        console.error('PTT kontrol hatası:', error);
+        return {
+            error: 'PTT servisine bağlanılamadı',
+            durum: 'KONTROL EDİLEMEDİ',
+            barkodNo: barkodNo
+        };
+    }
+});

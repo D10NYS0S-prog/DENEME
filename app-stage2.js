@@ -428,12 +428,182 @@ async function loadNotlarTab(dosyaId, contentEl) {
 }
 
 async function loadTebligatTab(dosyaId, contentEl) {
+    const file = currentFilesMap.get(dosyaId);
+    
     contentEl.innerHTML = `
-        <p class="text-muted">Tebligat kontrolü özelliği yakında eklenecek</p>
-        <button class="btn-primary mt-10" onclick="checkTebligatForFile('${dosyaId}')">
-            📮 Tebligat Kontrolü Yap
-        </button>
+        <div class="tebligat-section">
+            <h4>📮 Tebligat Kontrolü</h4>
+            <p class="text-muted">Bu dosyanın evraklarındaki tebligat durumlarını kontrol edin</p>
+            
+            <div class="tebligat-actions">
+                <button class="btn-primary" onclick="checkAllTebligatForFile('${dosyaId}')">
+                    🔄 Tüm Tebligatları Kontrol Et
+                </button>
+                <button class="btn-secondary" onclick="checkETebligatForFile('${dosyaId}')">
+                    💻 Sadece eTebligat Kontrol Et
+                </button>
+            </div>
+            
+            <div id="tebligat-results" class="tebligat-results" style="margin-top: 20px;">
+                <p class="text-muted text-center">Kontrol sonuçları burada görünecek</p>
+            </div>
+        </div>
     `;
+}
+
+// Check all tebligat for a file
+window.checkAllTebligatForFile = async function(dosyaId) {
+    const resultsEl = document.getElementById('tebligat-results');
+    resultsEl.innerHTML = '<p class="text-center">⏳ Evraklar alınıyor ve tebligatlar kontrol ediliyor...</p>';
+    
+    try {
+        // Get all evrak for the file
+        const evrakData = await uyapApi.getAllEvrak(dosyaId);
+        
+        if (!evrakData || evrakData.all.length === 0) {
+            resultsEl.innerHTML = '<p class="text-center text-muted">Bu dosyada evrak bulunamadı</p>';
+            return;
+        }
+        
+        // Filter evrak that might have tebligat
+        const tebligatEvrak = evrakData.all.filter(evrak => 
+            evrak.evrakTur && (
+                evrak.evrakTur.toLowerCase().includes('tebligat') ||
+                evrak.evrakTur.toLowerCase().includes('tebliğ') ||
+                evrak.barkodNo
+            )
+        );
+        
+        if (tebligatEvrak.length === 0) {
+            resultsEl.innerHTML = '<p class="text-center text-muted">Bu dosyada tebligat evrağı bulunamadı</p>';
+            return;
+        }
+        
+        showToast(`${tebligatEvrak.length} tebligat kontrol ediliyor...`, 'info');
+        resultsEl.innerHTML = `<p class="text-center">⏳ ${tebligatEvrak.length} tebligat kontrol ediliyor...</p>`;
+        
+        // Check tebligat status
+        const results = await uyapApi.checkTebligatStatus(tebligatEvrak);
+        
+        // Display results
+        displayTebligatResults(results, resultsEl);
+        showToast('Tebligat kontrolü tamamlandı', 'success');
+        
+    } catch (error) {
+        resultsEl.innerHTML = `<p class="text-center" style="color: var(--danger-color);">Hata: ${error.message}</p>`;
+        showToast('Tebligat kontrolü hatası: ' + error.message, 'error');
+    }
+};
+
+// Check only eTebligat for a file
+window.checkETebligatForFile = async function(dosyaId) {
+    const resultsEl = document.getElementById('tebligat-results');
+    resultsEl.innerHTML = '<p class="text-center">⏳ eTebligat kontrol ediliyor...</p>';
+    
+    try {
+        const evrakData = await uyapApi.getAllEvrak(dosyaId);
+        
+        if (!evrakData || evrakData.all.length === 0) {
+            resultsEl.innerHTML = '<p class="text-center text-muted">Bu dosyada evrak bulunamadı</p>';
+            return;
+        }
+        
+        // Filter only eTebligat
+        const eTebligatEvrak = evrakData.all.filter(evrak => 
+            evrak.eTebligat === true || evrak.eTebligat === 1
+        );
+        
+        if (eTebligatEvrak.length === 0) {
+            resultsEl.innerHTML = '<p class="text-center text-muted">Bu dosyada eTebligat bulunamadı</p>';
+            return;
+        }
+        
+        showToast(`${eTebligatEvrak.length} eTebligat kontrol ediliyor...`, 'info');
+        
+        // Calculate eTebligat status (no API call needed)
+        const results = eTebligatEvrak.map(evrak => 
+            uyapApi.calculateETebligatStatus(evrak)
+        );
+        
+        displayTebligatResults(results, resultsEl);
+        showToast('eTebligat kontrolü tamamlandı', 'success');
+        
+    } catch (error) {
+        resultsEl.innerHTML = `<p class="text-center" style="color: var(--danger-color);">Hata: ${error.message}</p>`;
+        showToast('eTebligat kontrolü hatası: ' + error.message, 'error');
+    }
+};
+
+// Display tebligat results in a nice format
+function displayTebligatResults(results, containerEl) {
+    if (!results || results.length === 0) {
+        containerEl.innerHTML = '<p class="text-center text-muted">Sonuç bulunamadı</p>';
+        return;
+    }
+    
+    // Count statuses
+    const delivered = results.filter(r => r.isLastState === 2).length;
+    const failed = results.filter(r => r.isLastState === 1).length;
+    const pending = results.filter(r => r.isLastState === 0 || !r.isLastState).length;
+    
+    const html = `
+        <div class="tebligat-summary">
+            <div class="summary-card success">
+                <div class="summary-icon">✅</div>
+                <div class="summary-info">
+                    <strong>${delivered}</strong>
+                    <span>Teslim Edildi</span>
+                </div>
+            </div>
+            <div class="summary-card danger">
+                <div class="summary-icon">❌</div>
+                <div class="summary-info">
+                    <strong>${failed}</strong>
+                    <span>Teslim Edilemedi</span>
+                </div>
+            </div>
+            <div class="summary-card warning">
+                <div class="summary-icon">⏳</div>
+                <div class="summary-info">
+                    <strong>${pending}</strong>
+                    <span>Beklemede</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tebligat-details" style="margin-top: 20px; max-height: 300px; overflow-y: auto;">
+            ${results.map(teb => {
+                const statusClass = 
+                    teb.isLastState === 2 ? 'success' : 
+                    teb.isLastState === 1 ? 'danger' : 
+                    'warning';
+                
+                const statusIcon = 
+                    teb.isLastState === 2 ? '✅' : 
+                    teb.isLastState === 1 ? '❌' : 
+                    '⏳';
+                
+                return `
+                    <div class="tebligat-card ${statusClass}">
+                        <div class="tebligat-header">
+                            <span class="tebligat-icon">${statusIcon}</span>
+                            <strong>${teb.evrakTur || 'Tebligat'}</strong>
+                        </div>
+                        <div class="tebligat-body">
+                            <p><strong>Durum:</strong> ${teb.durum || 'Bilinmiyor'}</p>
+                            ${teb.evrakTarih ? `<p><strong>Evrak Tarihi:</strong> ${teb.evrakTarih}</p>` : ''}
+                            ${teb.lastStateTarihi ? `<p><strong>Durum Tarihi:</strong> ${new Date(teb.lastStateTarihi).toLocaleDateString('tr-TR')}</p>` : ''}
+                            ${teb.barkodNo ? `<p><strong>Barkod:</strong> ${teb.barkodNo}</p>` : ''}
+                            ${teb.eTebligat ? `<p><span class="badge">💻 eTebligat</span></p>` : ''}
+                            ${teb.aciklama ? `<p class="text-muted">${teb.aciklama}</p>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+    
+    containerEl.innerHTML = html;
 }
 
 // ============================================================================
