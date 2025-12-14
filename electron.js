@@ -2,9 +2,6 @@ const { app, BrowserWindow, BrowserView, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs'); // Dosya yazmak için eklendi
 
-// ... (aradaki kodlar aynı kalsın) ...
-
-// UYAP Data Handler (Interception)
 // UYAP Data Handler (Interception)
 ipcMain.on('uyap-data', (event, packet) => {
     // packet: { url: string, data: any }
@@ -234,9 +231,6 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
 });
-
-// UYAP Data Handler (Interception)
-// Duplicate listener removed
 
 // Forward XHook Status to Renderer
 ipcMain.on('xhook-status', (event, status) => {
