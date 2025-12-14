@@ -485,16 +485,21 @@ class UYAPApi {
             task.due = new Date(dueDate).toISOString();
         }
 
+        // Properly escape values for security
+        const escapedToken = String(token).replace(/'/g, "\\'");
+        const escapedTaskListId = String(this.googleIntegration.tasks.taskListId).replace(/'/g, "\\'");
+        const taskJson = JSON.stringify(task);
+
         const script = `
             (async () => {
                 try {
-                    const response = await fetch('${this.googleIntegration.tasks.apiUrl}/lists/${this.googleIntegration.tasks.taskListId}/tasks', {
+                    const response = await fetch('${this.googleIntegration.tasks.apiUrl}/lists/${escapedTaskListId}/tasks', {
                         method: 'POST',
                         headers: {
-                            'Authorization': 'Bearer ${token}',
+                            'Authorization': 'Bearer ${escapedToken}',
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify(${JSON.stringify(task)})
+                        body: '${taskJson.replace(/'/g, "\\'")}'
                     });
                     
                     if (!response.ok) {
@@ -554,16 +559,21 @@ class UYAPApi {
             return { error: 'Token bulunamadı' };
         }
 
-        const fileName = `${avukatId}.json`;
-        const query = `name='${fileName}' and '${this.googleIntegration.drive.appDataFolder}' in parents`;
+        // Validate and escape inputs
+        const escapedToken = String(token).replace(/'/g, "\\'");
+        const escapedAvukatId = String(avukatId).replace(/[^a-zA-Z0-9]/g, '');
+        const fileName = `${escapedAvukatId}.json`;
+        const escapedFolder = String(this.googleIntegration.drive.appDataFolder).replace(/'/g, "\\'");
+        const query = `name='${fileName}' and '${escapedFolder}' in parents`;
+        const encodedQuery = encodeURIComponent(query);
 
         const script = `
             (async () => {
                 try {
-                    const response = await fetch('${this.googleIntegration.drive.apiUrl}/files?spaces=appDataFolder&fields=*&orderBy=createdTime desc&q=${encodeURIComponent(query)}', {
+                    const response = await fetch('${this.googleIntegration.drive.apiUrl}/files?spaces=appDataFolder&fields=*&orderBy=createdTime desc&q=${encodedQuery}', {
                         method: 'GET',
                         headers: {
-                            'Authorization': 'Bearer ${token}'
+                            'Authorization': 'Bearer ${escapedToken}'
                         }
                     });
                     
@@ -598,17 +608,25 @@ class UYAPApi {
             description: description
         };
 
+        // Escape values properly
+        const escapedToken = String(token).replace(/'/g, "\\'");
+        const metadataJson = JSON.stringify(metadata);
+        const dataJson = JSON.stringify(data);
+
         const script = `
             (async () => {
                 try {
                     const formData = new FormData();
-                    formData.append('metadata', new Blob([JSON.stringify(${JSON.stringify(metadata)})], { type: 'application/json' }));
-                    formData.append('file', new Blob([JSON.stringify(${JSON.stringify(data)})], { type: 'application/json' }));
+                    const metadataBlob = new Blob([${JSON.stringify(metadataJson)}], { type: 'application/json' });
+                    const dataBlob = new Blob([${JSON.stringify(dataJson)}], { type: 'application/json' });
+                    
+                    formData.append('metadata', metadataBlob);
+                    formData.append('file', dataBlob);
                     
                     const response = await fetch('${this.googleIntegration.drive.apiUrl}/upload/drive/v3/files?uploadType=multipart&fields=*', {
                         method: 'POST',
                         headers: {
-                            'Authorization': 'Bearer ${token}'
+                            'Authorization': 'Bearer ${escapedToken}'
                         },
                         body: formData
                     });
@@ -888,7 +906,16 @@ class UYAPApi {
      * Generate unique queue ID
      */
     generateQueueId() {
-        return Math.floor(Math.random() * 0x10000).toString(16).substring(1);
+        // Use crypto for better randomness and avoid collisions
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        // Fallback to more robust random generation
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
     }
 
     /**
@@ -1085,10 +1112,13 @@ class UYAPApi {
         try {
             const session = await this.ensureSession();
             
-            // Format dates as DD.MM.YYYY
+            // Format dates as DD.MM.YYYY with proper padding
             const formatDate = (date) => {
                 const d = new Date(date);
-                return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+                const day = String(d.getDate()).padStart(2, '0');
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const year = d.getFullYear();
+                return `${day}.${month}.${year}`;
             };
             
             const payload = {
@@ -1297,10 +1327,13 @@ class UYAPApi {
     formatDosyaNo(dosyaNo) {
         if (!dosyaNo) return '';
         
+        // UYAP dosya format: YYYY/XXXXX (5 digit sıra number)
+        const DOSYA_SIRA_LENGTH = 5;
+        
         // Format: YYYY/XXXXX
         const parts = dosyaNo.split('/');
         if (parts.length === 2) {
-            return `${parts[0]}/${parts[1].padStart(5, '0')}`;
+            return `${parts[0]}/${parts[1].padStart(DOSYA_SIRA_LENGTH, '0')}`;
         }
         return dosyaNo;
     }
