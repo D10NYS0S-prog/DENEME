@@ -54,6 +54,26 @@
 
                 <!-- Dosyalar Tab -->
                 <div class="tab-content active" id="tab-dosyalar">
+                    <div class="tab-header">
+                        <h2>📂 Dosyalarım</h2>
+                        <div class="header-actions">
+                            <span id="cacheStatus" class="cache-status"></span>
+                            <button id="syncAllFilesBtn" class="btn btn-primary btn-with-icon">
+                                🔄 Tüm Dosyaları Senkronize Et
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="syncProgress" class="sync-progress" style="display: none;">
+                        <div class="progress-info">
+                            <span>Senkronizasyon: <strong><span id="syncCount">0</span>/<span id="syncTotal">?</span></strong></span>
+                            <span id="syncStatus" class="status-text">Başlatılıyor...</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div id="syncBar" class="progress-bar"></div>
+                        </div>
+                    </div>
+
                     <div class="search-container">
                         <input type="text" id="simpleSearchInput" placeholder="Dosya No..." class="search-input">
                         <button id="simpleSearchBtn" class="btn-primary">Ara</button>

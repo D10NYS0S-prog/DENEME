@@ -27,6 +27,7 @@ window.addEventListener('DOMContentLoaded', () => {
     initializeDatabase();
     loadNotes();
     checkGoogleAuth();
+    autoLoadFiles(); // Auto-load cached files on startup
     console.log('✅ Stage 2 UI Initialized');
 });
 
@@ -38,6 +39,181 @@ async function initializeDatabase() {
     } catch (error) {
         console.error('❌ Veritabanı başlatma hatası:', error);
         showToast('Veritabanı başlatılamadı', 'error');
+    }
+}
+
+// ============================================================================
+// PERSISTENT FILE CACHE SYSTEM
+// ============================================================================
+
+// Save files to persistent cache
+function saveFilesToCache(files) {
+    try {
+        const cacheData = {
+            files: files,
+            timestamp: Date.now(),
+            version: '1.0'
+        };
+        localStorage.setItem('uyap_files_cache', JSON.stringify(cacheData));
+        console.log(`✅ ${files.length} dosya önbelleğe kaydedildi`);
+    } catch (error) {
+        console.error('❌ Önbellek kaydetme hatası:', error);
+    }
+}
+
+// Load files from cache with age check
+function loadFilesFromCache() {
+    try {
+        const cached = localStorage.getItem('uyap_files_cache');
+        if (!cached) return null;
+        
+        const cacheData = JSON.parse(cached);
+        const age = Date.now() - cacheData.timestamp;
+        const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+        
+        if (age > maxAge) {
+            console.log('⚠️ Önbellek süresi dolmuş');
+            return null;
+        }
+        
+        console.log(`✅ ${cacheData.files.length} dosya önbellekten yüklendi`);
+        return cacheData;
+    } catch (error) {
+        console.error('❌ Önbellek yükleme hatası:', error);
+        return null;
+    }
+}
+
+// Get human-readable cache age
+function getCacheAge(timestamp) {
+    const age = Date.now() - timestamp;
+    const hours = Math.floor(age / (60 * 60 * 1000));
+    const minutes = Math.floor((age % (60 * 60 * 1000)) / (60 * 1000));
+    
+    if (hours > 0) return `${hours} saat önce`;
+    if (minutes > 0) return `${minutes} dakika önce`;
+    return 'Az önce';
+}
+
+// Update cache status display
+function updateCacheStatus(timestamp) {
+    const statusEl = document.getElementById('cacheStatus');
+    if (statusEl && timestamp) {
+        statusEl.textContent = `Son güncelleme: ${getCacheAge(timestamp)}`;
+        statusEl.style.display = 'inline-block';
+    }
+}
+
+// Auto-load files on application startup
+async function autoLoadFiles() {
+    const cached = loadFilesFromCache();
+    
+    if (cached && cached.files) {
+        // Load from cache
+        cached.files.forEach(file => {
+            currentFilesMap.set(file.dosyaId, file);
+        });
+        renderFileList();
+        updateCacheStatus(cached.timestamp);
+        updateBadge('dosyalar', cached.files.length);
+        showToast(`${cached.files.length} dosya önbellekten yüklendi`, 'success');
+        
+        // Auto-refresh if > 24 hours
+        const age = Date.now() - cached.timestamp;
+        if (age > 24 * 60 * 60 * 1000) {
+            showToast('Önbellek güncelleniyor...', 'info');
+            setTimeout(() => syncAllFiles(true), 3000);
+        }
+    } else {
+        // No cache
+        setTimeout(() => {
+            const userWants = confirm('Dosyalar önbellekte yok. Tüm dosyalar sorgulansin mı?\n\n(Bu işlem 2-5 dakika sürebilir)');
+            if (userWants) {
+                syncAllFiles(false);
+            }
+        }, 1000);
+    }
+}
+
+// One-click sync all file types
+async function syncAllFiles(silent = false) {
+    const btn = document.getElementById('syncAllFilesBtn');
+    const progressContainer = document.getElementById('syncProgress');
+    const countEl = document.getElementById('syncCount');
+    const totalEl = document.getElementById('syncTotal');
+    const barEl = document.getElementById('syncBar');
+    const statusEl = document.getElementById('syncStatus');
+    
+    if (!btn) {
+        console.error('Sync button not found');
+        return;
+    }
+    
+    try {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Senkronize Ediliyor...';
+        if (progressContainer) progressContainer.style.display = 'block';
+        
+        if (!silent) showToast('Tüm dosyalar sorgulanıyor...', 'info');
+        
+        // Query all file types
+        const fileTypes = [
+            { code: '0991', name: 'Hukuk Mahkemeleri' },
+            { code: '0992', name: 'Ceza Mahkemeleri' },
+            { code: '6700', name: 'İcra Daireleri' },
+            { code: '1199', name: 'İdare Mahkemeleri' }
+        ];
+        
+        let allFiles = [];
+        
+        for (let i = 0; i < fileTypes.length; i++) {
+            const type = fileTypes[i];
+            if (statusEl) statusEl.textContent = `${type.name} sorgulanıyor...`;
+            
+            try {
+                const result = await uyapApi.searchFiles({
+                    birimTuru3: type.code,
+                    dosyaDurumKod: 1, // Only open files
+                    pageSize: 500
+                });
+                
+                if (result && result.files) {
+                    allFiles = allFiles.concat(result.files);
+                    if (countEl) countEl.textContent = allFiles.length;
+                    if (totalEl) totalEl.textContent = '?';
+                    if (barEl) barEl.style.width = `${((i + 1) / fileTypes.length) * 100}%`;
+                }
+            } catch (error) {
+                console.error(`${type.name} hatası:`, error);
+            }
+            
+            // Delay between queries
+            await new Promise(r => setTimeout(r, 1500));
+        }
+        
+        // Save to cache
+        saveFilesToCache(allFiles);
+        
+        // Update UI
+        currentFilesMap.clear();
+        allFiles.forEach(file => currentFilesMap.set(file.dosyaId, file));
+        renderFileList();
+        updateCacheStatus(Date.now());
+        updateBadge('dosyalar', allFiles.length);
+        
+        if (!silent) {
+            showToast(`✅ ${allFiles.length} dosya senkronize edildi ve kaydedildi`, 'success');
+        }
+        
+    } catch (error) {
+        console.error('Senkronizasyon hatası:', error);
+        showToast('Senkronizasyon hatası: ' + error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '🔄 Tüm Dosyaları Senkronize Et';
+        if (progressContainer) {
+            setTimeout(() => progressContainer.style.display = 'none', 2000);
+        }
     }
 }
 
@@ -1525,6 +1701,9 @@ function initializeEventListeners() {
     document.getElementById('badge-evraklar')?.addEventListener('click', () => switchTab('dosyalar'));
     document.getElementById('badge-tebligatlar')?.addEventListener('click', () => switchTab('dosyalar'));
     document.getElementById('badge-notlar')?.addEventListener('click', () => switchTab('notlar'));
+    
+    // Sync all files button
+    document.getElementById('syncAllFilesBtn')?.addEventListener('click', () => syncAllFiles(false));
 }
 
 // ============================================================================
