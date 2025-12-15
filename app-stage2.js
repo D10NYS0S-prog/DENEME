@@ -381,11 +381,85 @@ async function loadEvraklarTab(dosyaId, contentEl) {
         <p>📥 Gelen: ${evrakData.gelen.length}</p>
         <p>📤 Giden: ${evrakData.giden.length}</p>
         <p>📋 Diğer: ${evrakData.diger.length}</p>
-        <button class="btn-primary mt-10" onclick="openModal('docsModal'); loadFullEvrakModal('${dosyaId}')">
+        <button class="btn-primary mt-10" onclick="loadFullEvrakModal('${dosyaId}')">
             Tüm Evrakları Görüntüle
         </button>
     `;
 }
+
+// Load full evrak list in modal
+window.loadFullEvrakModal = async function(dosyaId) {
+    try {
+        openModal('docsModal');
+        const docsList = document.getElementById('docsList');
+        docsList.innerHTML = '<p class="text-center">⏳ Evraklar yükleniyor...</p>';
+        
+        const evrakData = await uyapApi.getAllEvrak(dosyaId);
+        
+        if (!evrakData || evrakData.all.length === 0) {
+            docsList.innerHTML = '<p class="text-center text-muted">Evrak bulunamadı</p>';
+            return;
+        }
+        
+        let html = '<div class="evrak-list">';
+        
+        // Gelen Evraklar
+        if (evrakData.gelen.length > 0) {
+            html += '<h4 style="margin-top: 0;">📥 Gelen Evraklar</h4>';
+            evrakData.gelen.forEach(evrak => {
+                html += `
+                    <div class="evrak-card" style="margin-bottom: 10px; padding: 12px; background: var(--light-bg); border-radius: 6px; border-left: 3px solid var(--success-color);">
+                        <strong>${evrak.evrakTur || 'Evrak'}</strong>
+                        <p style="margin: 5px 0; font-size: 13px; color: var(--text-secondary);">
+                            ${evrak.evrakTarih || ''} ${evrak.evrakNo ? '- ' + evrak.evrakNo : ''}
+                        </p>
+                        ${evrak.aciklama ? `<p style="margin: 5px 0; font-size: 12px;">${evrak.aciklama}</p>` : ''}
+                    </div>
+                `;
+            });
+        }
+        
+        // Giden Evraklar
+        if (evrakData.giden.length > 0) {
+            html += '<h4 style="margin-top: 15px;">📤 Giden Evraklar</h4>';
+            evrakData.giden.forEach(evrak => {
+                html += `
+                    <div class="evrak-card" style="margin-bottom: 10px; padding: 12px; background: var(--light-bg); border-radius: 6px; border-left: 3px solid var(--primary-color);">
+                        <strong>${evrak.evrakTur || 'Evrak'}</strong>
+                        <p style="margin: 5px 0; font-size: 13px; color: var(--text-secondary);">
+                            ${evrak.evrakTarih || ''} ${evrak.evrakNo ? '- ' + evrak.evrakNo : ''}
+                        </p>
+                        ${evrak.aciklama ? `<p style="margin: 5px 0; font-size: 12px;">${evrak.aciklama}</p>` : ''}
+                    </div>
+                `;
+            });
+        }
+        
+        // Diğer Evraklar
+        if (evrakData.diger.length > 0) {
+            html += '<h4 style="margin-top: 15px;">📋 Diğer Evraklar</h4>';
+            evrakData.diger.forEach(evrak => {
+                html += `
+                    <div class="evrak-card" style="margin-bottom: 10px; padding: 12px; background: var(--light-bg); border-radius: 6px; border-left: 3px solid var(--text-muted);">
+                        <strong>${evrak.evrakTur || 'Evrak'}</strong>
+                        <p style="margin: 5px 0; font-size: 13px; color: var(--text-secondary);">
+                            ${evrak.evrakTarih || ''} ${evrak.evrakNo ? '- ' + evrak.evrakNo : ''}
+                        </p>
+                        ${evrak.aciklama ? `<p style="margin: 5px 0; font-size: 12px;">${evrak.aciklama}</p>` : ''}
+                    </div>
+                `;
+            });
+        }
+        
+        html += '</div>';
+        docsList.innerHTML = html;
+        
+    } catch (error) {
+        const docsList = document.getElementById('docsList');
+        docsList.innerHTML = `<p class="text-center" style="color: var(--danger-color);">Hata: ${error.message}</p>`;
+        showToast('Evraklar yüklenemedi: ' + error.message, 'error');
+    }
+};
 
 async function loadMaliTab(dosyaId, contentEl) {
     const maliData = await uyapApi.getTahsilatBilgileri(dosyaId);
