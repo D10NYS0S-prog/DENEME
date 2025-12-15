@@ -465,6 +465,36 @@ window.loadFullEvrakModal = async function(dosyaId) {
             `;
         };
         
+        // Helper function to sort evrak by date (newest first)
+        const sortByDate = (evrakList) => {
+            return evrakList.sort((a, b) => {
+                // Get sisteme gönderildiği tarih or fallback to evrak tarih
+                const dateA = a.sistemeGonderildigiTarih || a.sistemeGonderilmeTarihi || a.evrakTarih || a.evrakTarihi || '';
+                const dateB = b.sistemeGonderildigiTarih || b.sistemeGonderilmeTarihi || b.evrakTarih || b.evrakTarihi || '';
+                
+                if (!dateA) return 1; // No date, push to end
+                if (!dateB) return -1; // No date, push to end
+                
+                // Parse dates - handle both ISO format and dd.MM.yyyy format
+                const parseDate = (dateStr) => {
+                    if (!dateStr) return new Date(0);
+                    // Try ISO format first
+                    let date = new Date(dateStr);
+                    if (!isNaN(date.getTime())) return date;
+                    
+                    // Try dd.MM.yyyy format
+                    const parts = dateStr.split('.');
+                    if (parts.length === 3) {
+                        date = new Date(parts[2], parts[1] - 1, parts[0]);
+                        if (!isNaN(date.getTime())) return date;
+                    }
+                    return new Date(0);
+                };
+                
+                return parseDate(dateB) - parseDate(dateA); // Descending order (newest first)
+            });
+        };
+        
         let html = '<div class="evrak-list">';
         
         // Toplu indirme butonu
@@ -476,26 +506,26 @@ window.loadFullEvrakModal = async function(dosyaId) {
             </div>
         `;
         
-        // Gelen Evraklar
+        // Gelen Evraklar - sorted by date
         if (evrakData.gelen.length > 0) {
             html += `<h4 style="margin-top: 0;">📥 Gelen Evraklar (${evrakData.gelen.length})</h4>`;
-            evrakData.gelen.forEach(evrak => {
+            sortByDate(evrakData.gelen).forEach(evrak => {
                 html += formatEvrakCard(evrak, 'var(--success-color)');
             });
         }
         
-        // Giden Evraklar
+        // Giden Evraklar - sorted by date
         if (evrakData.giden.length > 0) {
             html += `<h4 style="margin-top: 15px;">📤 Giden Evraklar (${evrakData.giden.length})</h4>`;
-            evrakData.giden.forEach(evrak => {
+            sortByDate(evrakData.giden).forEach(evrak => {
                 html += formatEvrakCard(evrak, 'var(--primary-color)');
             });
         }
         
-        // Diğer Evraklar
+        // Diğer Evraklar - sorted by date
         if (evrakData.diger.length > 0) {
             html += `<h4 style="margin-top: 15px;">📋 Diğer Evraklar (${evrakData.diger.length})</h4>`;
-            evrakData.diger.forEach(evrak => {
+            sortByDate(evrakData.diger).forEach(evrak => {
                 html += formatEvrakCard(evrak, 'var(--text-muted)');
             });
         }

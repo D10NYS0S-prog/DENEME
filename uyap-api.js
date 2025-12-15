@@ -1905,22 +1905,30 @@ class UYAPApi {
      */
     async downloadEvrak(evrakId, evrakNo, dosyaId) {
         try {
-            const blob = await this.downloadDocument({
+            const result = await this.downloadDocument({
                 evrakId: evrakId,
                 dosyaId: dosyaId
             });
             
-            if (!blob) {
-                throw new Error('Evrak indirilemedi');
+            if (!result || result.error) {
+                throw new Error(result?.error || 'Evrak indirilemedi');
             }
+
+            // Convert base64 to blob
+            const binaryString = atob(result.base64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            const blob = new Blob([bytes], { type: result.mime || 'application/pdf' });
 
             // Create download link
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = url;
-            // Filename: evrakNo or evrakId + .pdf
-            a.download = `${evrakNo || evrakId || 'evrak'}.pdf`;
+            // Use filename from response or fallback to evrakNo/evrakId
+            a.download = result.filename || `${evrakNo || evrakId || 'evrak'}.pdf`;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
