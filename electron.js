@@ -122,6 +122,7 @@ try {
 
 let mainWindow;
 let view; // Global view variable
+let viewVisible = true; // Track BrowserView visibility state for performance
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -135,8 +136,8 @@ function createWindow() {
 
     mainWindow.loadFile('index.html');
 
-    // Ana pencerenin DevTools'unu aç
-    mainWindow.webContents.openDevTools();
+    // Ana pencerenin DevTools'unu aç (geliştirme için)
+    // mainWindow.webContents.openDevTools();
 
     // BrowserView ile UYAP'ı yükle
     view = new BrowserView({
@@ -206,16 +207,18 @@ function createWindow() {
 
     // View Visibility Handlers (Fix for Modal Overlay)
     ipcMain.on('hide-view', () => {
-        if (mainWindow) {
+        if (mainWindow && viewVisible) {
             mainWindow.setBrowserView(null);
+            viewVisible = false;
             console.log('🙈 BrowserView hidden (Modal open)');
         }
     });
 
     ipcMain.on('show-view', () => {
-        if (mainWindow && view) {
+        if (mainWindow && view && !viewVisible) {
             mainWindow.setBrowserView(view);
             updateViewBounds(); // Restore correct size/position
+            viewVisible = true;
             console.log('👁️ BrowserView restored');
         }
     });
