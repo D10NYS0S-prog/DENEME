@@ -150,9 +150,30 @@ function createWindow() {
 
     mainWindow.setBrowserView(view);
 
-    // View Boyutlarını Ayarla (Sidebar 300px, Header ~60px)
-    // index.html'deki CSS'e göre ayarlıyoruz
-    mainWindow.setBrowserView(view);
+    // View Boyutlarını Dinamik Ayarla (Sidebar 300px, Header 48px)
+    function updateViewBounds() {
+        const { width, height } = mainWindow.getContentBounds();
+        const HEADER_HEIGHT = 48;  // Compact header
+        const SIDEBAR_WIDTH = 300; // Fixed sidebar
+        
+        view.setBounds({
+            x: SIDEBAR_WIDTH,
+            y: HEADER_HEIGHT,
+            width: Math.max(width - SIDEBAR_WIDTH, 0),
+            height: Math.max(height - HEADER_HEIGHT, 0)
+        });
+    }
+    
+    // Initial bounds calculation
+    updateViewBounds();
+    
+    // Update on window state changes
+    mainWindow.on('resize', updateViewBounds);
+    mainWindow.on('maximize', updateViewBounds);
+    mainWindow.on('unmaximize', updateViewBounds);
+    
+    // Load UYAP
+    view.webContents.loadURL('https://uyap.gov.tr');
 
     // Automation Handler
     ipcMain.on('start-automation', () => {
@@ -180,12 +201,15 @@ function createWindow() {
     function updateViewBounds() {
         const [cw, ch] = mainWindow.getContentSize();
         // Sidebar: 300px width
-        // Header (~60px) + Status Bar (~40px) = ~100px top offset
-        // We must ensure it doesn't cover the sidebar
-        view.setBounds({ x: 300, y: 100, width: cw - 300, height: ch - 100 });
+        // Header: 48px (compact)
+        // Total top offset: 48px
+        view.setBounds({ x: 300, y: 48, width: Math.max(cw - 300, 0), height: Math.max(ch - 48, 0) });
     }
 
     updateViewBounds();
+    mainWindow.on('resize', updateViewBounds);
+    mainWindow.on('maximize', updateViewBounds);
+    mainWindow.on('unmaximize', updateViewBounds);
     view.setAutoResize({ width: true, height: true });
 
     // UYAP'ı yükle

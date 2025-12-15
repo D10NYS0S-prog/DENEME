@@ -64,7 +64,8 @@ body {
 header {
     background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
     color: white;
-    padding: 16px 24px;
+    padding: 8px 16px;
+    min-height: 48px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -76,11 +77,11 @@ header {
 .header-left {
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 15px;
 }
 
 h1 {
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 700;
     letter-spacing: -0.5px;
 }
@@ -88,16 +89,16 @@ h1 {
 .session-status {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     background: rgba(255, 255, 255, 0.2);
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 13px;
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 12px;
 }
 
 .status-dot {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: var(--warning-color);
     animation: pulse 2s infinite;
@@ -128,12 +129,13 @@ h1 {
 .badge-item {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     background: rgba(255, 255, 255, 0.2);
-    padding: 6px 12px;
-    border-radius: 20px;
+    padding: 4px 10px;
+    border-radius: 16px;
     cursor: pointer;
     transition: all 0.3s;
+    font-size: 13px;
 }
 
 .badge-item:hover {
@@ -142,7 +144,7 @@ h1 {
 }
 
 .badge-icon {
-    font-size: 16px;
+    font-size: 14px;
 }
 
 .badge-count {
