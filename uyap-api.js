@@ -1911,30 +1911,48 @@ class UYAPApi {
             });
             
             if (!result || result.error) {
-                throw new Error(result?.error || 'Evrak indirilemedi');
+                const errorMsg = result?.error || 'Evrak indirilemedi';
+                // Check for specific error types
+                if (errorMsg.includes('500')) {
+                    throw new Error('UYAP oturumu süresi dolmuş. Lütfen yeniden giriş yapın.');
+                } else if (errorMsg.includes('404') || errorMsg.includes('not found')) {
+                    throw new Error('Evrak bulunamadı. UYAP\'ta evrakın varlığını kontrol edin.');
+                } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
+                    throw new Error('Yetki hatası. UYAP oturumunuzu kontrol edin.');
+                }
+                throw new Error(errorMsg);
             }
 
-            // Convert base64 to blob
-            const binaryString = atob(result.base64);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
+            // Validate base64 data
+            if (!result.base64 || result.base64.length === 0) {
+                throw new Error('Evrak verisi boş. Dosya indirilemedi.');
             }
-            const blob = new Blob([bytes], { type: result.mime || 'application/pdf' });
 
-            // Create download link
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            // Use filename from response or fallback to evrakNo/evrakId
-            a.download = result.filename || `${evrakNo || evrakId || 'evrak'}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-            
-            return true;
+            // Convert base64 to blob with error handling
+            try {
+                const binaryString = atob(result.base64);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                const blob = new Blob([bytes], { type: result.mime || 'application/pdf' });
+
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                // Use filename from response or fallback to evrakNo/evrakId
+                a.download = result.filename || `${evrakNo || evrakId || 'evrak'}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                return true;
+            } catch (conversionError) {
+                throw new Error(`Evrak formatı hatalı: ${conversionError.message}`);
+            }
         } catch (error) {
             console.error('downloadEvrak error:', error);
             throw error;

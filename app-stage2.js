@@ -43,6 +43,55 @@ async function initializeDatabase() {
 }
 
 // ============================================================================
+// SESSION & ERROR HANDLING
+// ============================================================================
+
+// Check if UYAP session is valid
+async function checkUyapSession() {
+    try {
+        // Try a simple API call to verify session
+        const webview = document.getElementById('uyap-browser');
+        if (!webview) return false;
+        
+        // Check if webview has loaded UYAP
+        const url = webview.getURL();
+        if (!url || !url.includes('uyap.gov.tr')) {
+            return false;
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Session check error:', error);
+        return false;
+    }
+}
+
+// Enhanced error handler with specific messages
+function handleApiError(error, operation = 'İşlem') {
+    console.error(`[${operation} Hatası]`, error);
+    
+    let message = '';
+    let type = 'error';
+    
+    if (error.message && error.message.includes('500')) {
+        message = `${operation} başarısız: UYAP oturumu süresi dolmuş olabilir. Lütfen UYAP'a yeniden giriş yapın.`;
+        type = 'warning';
+    } else if (error.message && error.message.includes('401')) {
+        message = `${operation} başarısız: Yetki hatası. UYAP oturumunuzu kontrol edin.`;
+        type = 'warning';
+    } else if (error.message && error.message.includes('Network')) {
+        message = `${operation} başarısız: İnternet bağlantınızı kontrol edin.`;
+    } else if (error.message && error.message.includes('timeout')) {
+        message = `${operation} başarısız: İstek zaman aşımına uğradı. Lütfen tekrar deneyin.`;
+    } else {
+        message = `${operation} başarısız: ${error.message || 'Bilinmeyen hata'}`;
+    }
+    
+    showToast(message, type);
+    return message;
+}
+
+// ============================================================================
 // PERSISTENT FILE CACHE SYSTEM
 // ============================================================================
 
@@ -321,6 +370,17 @@ document.getElementById('bulkQueryBtn')?.addEventListener('click', async () => {
         btnEl.disabled = true;
         btnEl.textContent = '⏳ Sorgulanıyor...';
         progressContainer.style.display = 'block';
+        
+        // Check session first
+        const sessionValid = await checkUyapSession();
+        if (!sessionValid) {
+            showToast('⚠️ UYAP oturumu bulunamadı. Lütfen önce UYAP\'a giriş yapın.', 'warning');
+            btnEl.disabled = false;
+            btnEl.textContent = '🔄 Tümünü Sorgula';
+            progressContainer.style.display = 'none';
+            return;
+        }
+        
         showToast('Tüm dosyalar sorgulanıyor...', 'info');
         
         // Query all file types
@@ -332,6 +392,7 @@ document.getElementById('bulkQueryBtn')?.addEventListener('click', async () => {
         ];
         
         let allFiles = [];
+        let failedTypes = [];
         totalEl.textContent = '?';
         
         for (let i = 0; i < fileTypes.length; i++) {
@@ -349,9 +410,16 @@ document.getElementById('bulkQueryBtn')?.addEventListener('click', async () => {
                     allFiles = allFiles.concat(result.files);
                     countEl.textContent = allFiles.length;
                     barEl.style.width = `${((i + 1) / fileTypes.length) * 100}%`;
+                    console.log(`✅ ${type.name}: ${result.files.length} dosya`);
+                } else if (result && result.error) {
+                    failedTypes.push(type.name);
+                    console.error(`❌ ${type.name}: ${result.error}`);
+                    handleApiError(new Error(result.error), type.name);
                 }
             } catch (error) {
-                console.error(`${type.name} hatası:`, error);
+                failedTypes.push(type.name);
+                console.error(`❌ ${type.name} hatası:`, error);
+                handleApiError(error, type.name);
                 if (statusEl) statusEl.textContent = `${type.name} hatası! Devam ediliyor...`;
             }
             
@@ -360,7 +428,9 @@ document.getElementById('bulkQueryBtn')?.addEventListener('click', async () => {
         }
         
         // Save to cache
-        saveFilesToCache(allFiles);
+        if (allFiles.length > 0) {
+            saveFilesToCache(allFiles);
+        }
         
         // Update UI
         currentFilesMap.clear();
@@ -369,11 +439,22 @@ document.getElementById('bulkQueryBtn')?.addEventListener('click', async () => {
         updateCacheStatus(Date.now());
         updateBadge('dosyalar', allFiles.length);
         
-        showToast(`✅ ${allFiles.length} dosya sorgulandı ve kaydedildi!`, 'success');
+        // Show result with details
+        if (allFiles.length > 0) {
+            let message = `✅ ${allFiles.length} dosya sorgulandı ve kaydedildi!`;
+            if (failedTypes.length > 0) {
+                message += ` (${failedTypes.length} tür başarısız: ${failedTypes.join(', ')})`;
+                showToast(message, 'warning');
+            } else {
+                showToast(message, 'success');
+            }
+        } else {
+            showToast('⚠️ Hiç dosya bulunamadı. UYAP oturumunuzu kontrol edin.', 'warning');
+        }
         
     } catch (error) {
         console.error('Toplu sorgulama hatası:', error);
-        showToast('Sorgulama hatası: ' + error.message, 'error');
+        handleApiError(error, 'Toplu sorgulama');
     } finally {
         btnEl.disabled = false;
         btnEl.textContent = '🔄 Tümünü Sorgula';
