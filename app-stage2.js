@@ -49,19 +49,39 @@ async function initializeDatabase() {
 // Check if UYAP session is valid
 async function checkUyapSession() {
     try {
-        // Try a simple API call to verify session
         const webview = document.getElementById('uyap-browser');
-        if (!webview) return false;
+        if (!webview) {
+            console.log('[Session] WebView not found');
+            return false;
+        }
         
         // Check if webview has loaded UYAP
         const url = webview.getURL();
         if (!url || !url.includes('uyap.gov.tr')) {
+            console.log('[Session] Not on UYAP domain:', url);
             return false;
         }
         
-        return true;
+        // Try to execute a test JavaScript in the webview to check cookies
+        try {
+            const hasCookies = await webview.executeJavaScript(`
+                document.cookie.includes('JSESSIONID') || document.cookie.includes('SESSION')
+            `);
+            
+            if (!hasCookies) {
+                console.log('[Session] No UYAP session cookies found');
+                return false;
+            }
+            
+            console.log('[Session] Valid - has cookies');
+            return true;
+        } catch (cookieError) {
+            console.log('[Session] Cookie check failed, assuming valid if on UYAP domain');
+            // If we can't check cookies, assume valid if on UYAP domain
+            return true;
+        }
     } catch (error) {
-        console.error('Session check error:', error);
+        console.error('[Session] Check error:', error);
         return false;
     }
 }
