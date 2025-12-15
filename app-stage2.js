@@ -1236,11 +1236,8 @@ function openModal(modalId) {
     if (modal) {
         modal.classList.add('active');
         
-        // Hide webview container to prevent z-index issues (webview always renders on top)
-        const browserContainer = document.getElementById('browser-container');
-        if (browserContainer) {
-            browserContainer.classList.add('modal-open');
-        }
+        // Hide BrowserView using IPC (BrowserView always renders on top of HTML)
+        ipcRenderer.send('hide-view');
     }
 }
 
@@ -1249,11 +1246,8 @@ window.closeModal = function(modalId) {
     if (modal) {
         modal.classList.remove('active');
         
-        // Show webview container again
-        const browserContainer = document.getElementById('browser-container');
-        if (browserContainer) {
-            browserContainer.classList.remove('modal-open');
-        }
+        // Show BrowserView again using IPC
+        ipcRenderer.send('show-view');
     }
 };
 
@@ -1263,11 +1257,8 @@ document.querySelectorAll('.modal').forEach(modal => {
         if (e.target === modal) {
             modal.classList.remove('active');
             
-            // Show webview container again
-            const browserContainer = document.getElementById('browser-container');
-            if (browserContainer) {
-                browserContainer.classList.remove('modal-open');
-            }
+            // Show BrowserView again using IPC
+            ipcRenderer.send('show-view');
         }
     });
 });
