@@ -108,7 +108,7 @@ function updateCacheStatus(timestamp) {
 async function autoLoadFiles() {
     const cached = loadFilesFromCache();
     
-    if (cached && cached.files) {
+    if (cached && cached.files && cached.files.length > 0) {
         // Load from cache
         cached.files.forEach(file => {
             currentFilesMap.set(file.dosyaId, file);
@@ -121,99 +121,18 @@ async function autoLoadFiles() {
         // Auto-refresh if > 24 hours
         const age = Date.now() - cached.timestamp;
         if (age > 24 * 60 * 60 * 1000) {
-            showToast('Önbellek güncelleniyor...', 'info');
-            setTimeout(() => syncAllFiles(true), 3000);
+            showToast('Önbellek eski, güncelleme önerilir', 'warning');
+            // Don't auto-refresh, let user decide
         }
     } else {
-        // No cache
+        // No cache - prompt user to query
         setTimeout(() => {
             const userWants = confirm('Dosyalar önbellekte yok. Tüm dosyalar sorgulansin mı?\n\n(Bu işlem 2-5 dakika sürebilir)');
             if (userWants) {
-                syncAllFiles(false);
+                // Trigger bulk query button
+                document.getElementById('bulkQueryBtn')?.click();
             }
         }, 1000);
-    }
-}
-
-// One-click sync all file types
-async function syncAllFiles(silent = false) {
-    const btn = document.getElementById('syncAllFilesBtn');
-    const progressContainer = document.getElementById('syncProgress');
-    const countEl = document.getElementById('syncCount');
-    const totalEl = document.getElementById('syncTotal');
-    const barEl = document.getElementById('syncBar');
-    const statusEl = document.getElementById('syncStatus');
-    
-    if (!btn) {
-        console.error('Sync button not found');
-        return;
-    }
-    
-    try {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner"></span> Senkronize Ediliyor...';
-        if (progressContainer) progressContainer.style.display = 'block';
-        
-        if (!silent) showToast('Tüm dosyalar sorgulanıyor...', 'info');
-        
-        // Query all file types
-        const fileTypes = [
-            { code: '0991', name: 'Hukuk Mahkemeleri' },
-            { code: '0992', name: 'Ceza Mahkemeleri' },
-            { code: '6700', name: 'İcra Daireleri' },
-            { code: '1199', name: 'İdare Mahkemeleri' }
-        ];
-        
-        let allFiles = [];
-        
-        for (let i = 0; i < fileTypes.length; i++) {
-            const type = fileTypes[i];
-            if (statusEl) statusEl.textContent = `${type.name} sorgulanıyor...`;
-            
-            try {
-                const result = await uyapApi.searchFiles({
-                    birimTuru3: type.code,
-                    dosyaDurumKod: 1, // Only open files
-                    pageSize: 500
-                });
-                
-                if (result && result.files) {
-                    allFiles = allFiles.concat(result.files);
-                    if (countEl) countEl.textContent = allFiles.length;
-                    if (totalEl) totalEl.textContent = '?';
-                    if (barEl) barEl.style.width = `${((i + 1) / fileTypes.length) * 100}%`;
-                }
-            } catch (error) {
-                console.error(`${type.name} hatası:`, error);
-            }
-            
-            // Delay between queries
-            await new Promise(r => setTimeout(r, 1500));
-        }
-        
-        // Save to cache
-        saveFilesToCache(allFiles);
-        
-        // Update UI
-        currentFilesMap.clear();
-        allFiles.forEach(file => currentFilesMap.set(file.dosyaId, file));
-        renderFileList();
-        updateCacheStatus(Date.now());
-        updateBadge('dosyalar', allFiles.length);
-        
-        if (!silent) {
-            showToast(`✅ ${allFiles.length} dosya senkronize edildi ve kaydedildi`, 'success');
-        }
-        
-    } catch (error) {
-        console.error('Senkronizasyon hatası:', error);
-        showToast('Senkronizasyon hatası: ' + error.message, 'error');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '🔄 Tüm Dosyaları Senkronize Et';
-        if (progressContainer) {
-            setTimeout(() => progressContainer.style.display = 'none', 2000);
-        }
     }
 }
 
@@ -385,15 +304,9 @@ document.getElementById('simpleSearchBtn')?.addEventListener('click', async () =
     }
 });
 
-// Bulk query
+// Bulk query ALL FILES from UYAP (not parties!)
 document.getElementById('bulkQueryBtn')?.addEventListener('click', async () => {
-    const files = Array.from(currentFilesMap.values());
-    if (files.length === 0) {
-        showToast('Listede dosya yok', 'warning');
-        return;
-    }
-    
-    if (!confirm(`${files.length} dosya için taraf bilgisi sorgulanacak. Devam?`)) {
+    if (!confirm('Tüm dosya türleri (Hukuk, Ceza, İcra, İdare) sorgulanacak ve kaydedilecek.\\nBu işlem 2-5 dakika sürebilir. Devam?')) {
         return;
     }
     
@@ -401,39 +314,71 @@ document.getElementById('bulkQueryBtn')?.addEventListener('click', async () => {
     const countEl = document.getElementById('bulkCount');
     const totalEl = document.getElementById('bulkTotal');
     const barEl = document.getElementById('bulkBar');
+    const statusEl = document.getElementById('bulkStatus');
     const btnEl = document.getElementById('bulkQueryBtn');
     
-    progressContainer.style.display = 'block';
-    btnEl.disabled = true;
-    btnEl.textContent = '⏳ İşleniyor...';
-    totalEl.textContent = files.length;
-    
-    for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        countEl.textContent = i + 1;
-        barEl.style.width = `${((i + 1) / files.length) * 100}%`;
+    try {
+        btnEl.disabled = true;
+        btnEl.textContent = '⏳ Sorgulanıyor...';
+        progressContainer.style.display = 'block';
+        showToast('Tüm dosyalar sorgulanıyor...', 'info');
         
-        try {
-            if (!file.parties || file.parties.length === 0) {
-                const response = await uyapApi.getParties(file.dosyaId);
-                if (response?.data) {
-                    file.parties = Array.isArray(response.data) ? response.data : response.data.tarafListesi || [];
-                    currentFilesMap.set(file.dosyaId, file);
+        // Query all file types
+        const fileTypes = [
+            { code: '0991', name: 'Hukuk Mahkemeleri' },
+            { code: '0992', name: 'Ceza Mahkemeleri' },
+            { code: '6700', name: 'İcra Daireleri' },
+            { code: '1199', name: 'İdare Mahkemeleri' }
+        ];
+        
+        let allFiles = [];
+        totalEl.textContent = '?';
+        
+        for (let i = 0; i < fileTypes.length; i++) {
+            const type = fileTypes[i];
+            if (statusEl) statusEl.textContent = `${type.name} sorgulanıyor...`;
+            
+            try {
+                const result = await uyapApi.searchFiles({
+                    birimTuru3: type.code,
+                    dosyaDurumKod: 1, // Only open files
+                    pageSize: 500
+                });
+                
+                if (result && result.files) {
+                    allFiles = allFiles.concat(result.files);
+                    countEl.textContent = allFiles.length;
+                    barEl.style.width = `${((i + 1) / fileTypes.length) * 100}%`;
                 }
+            } catch (error) {
+                console.error(`${type.name} hatası:`, error);
+                if (statusEl) statusEl.textContent = `${type.name} hatası! Devam ediliyor...`;
             }
             
-            // Delay between requests
-            await new Promise(r => setTimeout(r, 3000 + Math.random() * 2000));
-        } catch (error) {
-            console.error(`Hata (${file.dosyaNo}):`, error);
+            // Delay between queries (prevent rate limiting)
+            await new Promise(r => setTimeout(r, 1500));
         }
+        
+        // Save to cache
+        saveFilesToCache(allFiles);
+        
+        // Update UI
+        currentFilesMap.clear();
+        allFiles.forEach(file => currentFilesMap.set(file.dosyaId, file));
+        renderFileList();
+        updateCacheStatus(Date.now());
+        updateBadge('dosyalar', allFiles.length);
+        
+        showToast(`✅ ${allFiles.length} dosya sorgulandı ve kaydedildi!`, 'success');
+        
+    } catch (error) {
+        console.error('Toplu sorgulama hatası:', error);
+        showToast('Sorgulama hatası: ' + error.message, 'error');
+    } finally {
+        btnEl.disabled = false;
+        btnEl.textContent = '🔄 Tümünü Sorgula';
+        setTimeout(() => progressContainer.style.display = 'none', 2000);
     }
-    
-    btnEl.disabled = false;
-    btnEl.textContent = '🔄 Tümünü Sorgula';
-    setTimeout(() => progressContainer.style.display = 'none', 3000);
-    renderFileList();
-    showToast('Sorgulama tamamlandı', 'success');
 });
 
 // Safahat query
@@ -1701,9 +1646,6 @@ function initializeEventListeners() {
     document.getElementById('badge-evraklar')?.addEventListener('click', () => switchTab('dosyalar'));
     document.getElementById('badge-tebligatlar')?.addEventListener('click', () => switchTab('dosyalar'));
     document.getElementById('badge-notlar')?.addEventListener('click', () => switchTab('notlar'));
-    
-    // Sync all files button
-    document.getElementById('syncAllFilesBtn')?.addEventListener('click', () => syncAllFiles(false));
 }
 
 // ============================================================================
