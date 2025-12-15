@@ -363,11 +363,39 @@ async function loadPartiesTab(dosyaId, contentEl) {
     
     contentEl.innerHTML = parties.map(party => {
         const name = party.adi || party.kisiKurumAdi || 'İsimsiz';
-        const role = party.sifatAdi || party.tarafSifat || 'Taraf';
+        const role = party.sifatAdi || party.tarafSifat || party.rol || 'Taraf';
+        
+        // Vekiller - Parse if it's a JSON string
+        let vekiller = [];
+        try {
+            if (typeof party.vekil === 'string') {
+                // Try to parse if it's JSON array string
+                if (party.vekil.startsWith('[')) {
+                    vekiller = JSON.parse(party.vekil);
+                } else if (party.vekil.trim()) {
+                    // Split by comma if it's comma-separated
+                    vekiller = party.vekil.split(',').map(v => v.trim()).filter(v => v);
+                }
+            } else if (Array.isArray(party.vekil)) {
+                vekiller = party.vekil;
+            }
+        } catch (e) {
+            console.log('Vekil parse error:', e);
+        }
+        
+        const vekillerHTML = vekiller.length > 0 
+            ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee; font-size: 13px; color: var(--text-secondary);">
+                <strong>Vekil(ler):</strong> ${vekiller.join(', ')}
+               </div>`
+            : '';
+        
         return `
             <div class="party-card" style="margin-bottom: 10px; padding: 12px; background: var(--light-bg); border-radius: 6px;">
-                <strong>${name}</strong>
-                <span style="float: right; color: var(--primary-color);">${role}</span>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong>${name}</strong>
+                    <span style="color: var(--primary-color); font-weight: 600;">${role}</span>
+                </div>
+                ${vekillerHTML}
             </div>
         `;
     }).join('');
@@ -401,53 +429,74 @@ window.loadFullEvrakModal = async function(dosyaId) {
             return;
         }
         
+        // Helper function to format evrak card with download button and date
+        const formatEvrakCard = (evrak, borderColor) => {
+            const evrakTur = evrak.evrakTur || evrak.tur || 'Evrak';
+            const evrakNo = evrak.evrakNo || evrak.birimEvrakNo || '';
+            const evrakTarih = evrak.evrakTarih || evrak.evrakTarihi || '';
+            // Sisteme gönderildiği tarih - this is the date when hovering in UYAP
+            const sistemeTarih = evrak.sistemeGonderildigiTarih || evrak.sistemeGonderilmeTarihi || '';
+            const aciklama = evrak.aciklama || '';
+            const evrakId = evrak.evrakId || evrak.id || '';
+            
+            const dateDisplay = sistemeTarih 
+                ? `📅 ${new Date(sistemeTarih).toLocaleDateString('tr-TR')}${evrakTarih ? ' (' + evrakTarih + ')' : ''}`
+                : (evrakTarih ? `📅 ${evrakTarih}` : '');
+            
+            return `
+                <div class="evrak-card" style="margin-bottom: 10px; padding: 12px; background: var(--light-bg); border-radius: 6px; border-left: 3px solid ${borderColor};">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div style="flex: 1;">
+                            <strong>${evrakTur}</strong>
+                            <p style="margin: 5px 0; font-size: 13px; color: var(--text-secondary);">
+                                ${dateDisplay}${evrakNo ? ' - No: ' + evrakNo : ''}
+                            </p>
+                            ${aciklama ? `<p style="margin: 5px 0; font-size: 12px;">${aciklama}</p>` : ''}
+                        </div>
+                        ${evrakId ? `
+                        <button class="btn-secondary" style="margin-left: 10px; padding: 6px 12px; font-size: 12px;" 
+                                onclick="downloadEvrak('${evrakId}', '${evrakNo}', '${dosyaId}')" 
+                                title="Evrakı İndir">
+                            📥 İndir
+                        </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        };
+        
         let html = '<div class="evrak-list">';
+        
+        // Toplu indirme butonu
+        html += `
+            <div style="margin-bottom: 15px; text-align: right;">
+                <button class="btn-primary" onclick="downloadAllEvrak('${dosyaId}')" style="padding: 8px 16px;">
+                    📥 Tümünü İndir (${evrakData.all.length} evrak)
+                </button>
+            </div>
+        `;
         
         // Gelen Evraklar
         if (evrakData.gelen.length > 0) {
-            html += '<h4 style="margin-top: 0;">📥 Gelen Evraklar</h4>';
+            html += `<h4 style="margin-top: 0;">📥 Gelen Evraklar (${evrakData.gelen.length})</h4>`;
             evrakData.gelen.forEach(evrak => {
-                html += `
-                    <div class="evrak-card" style="margin-bottom: 10px; padding: 12px; background: var(--light-bg); border-radius: 6px; border-left: 3px solid var(--success-color);">
-                        <strong>${evrak.evrakTur || 'Evrak'}</strong>
-                        <p style="margin: 5px 0; font-size: 13px; color: var(--text-secondary);">
-                            ${evrak.evrakTarih || ''} ${evrak.evrakNo ? '- ' + evrak.evrakNo : ''}
-                        </p>
-                        ${evrak.aciklama ? `<p style="margin: 5px 0; font-size: 12px;">${evrak.aciklama}</p>` : ''}
-                    </div>
-                `;
+                html += formatEvrakCard(evrak, 'var(--success-color)');
             });
         }
         
         // Giden Evraklar
         if (evrakData.giden.length > 0) {
-            html += '<h4 style="margin-top: 15px;">📤 Giden Evraklar</h4>';
+            html += `<h4 style="margin-top: 15px;">📤 Giden Evraklar (${evrakData.giden.length})</h4>`;
             evrakData.giden.forEach(evrak => {
-                html += `
-                    <div class="evrak-card" style="margin-bottom: 10px; padding: 12px; background: var(--light-bg); border-radius: 6px; border-left: 3px solid var(--primary-color);">
-                        <strong>${evrak.evrakTur || 'Evrak'}</strong>
-                        <p style="margin: 5px 0; font-size: 13px; color: var(--text-secondary);">
-                            ${evrak.evrakTarih || ''} ${evrak.evrakNo ? '- ' + evrak.evrakNo : ''}
-                        </p>
-                        ${evrak.aciklama ? `<p style="margin: 5px 0; font-size: 12px;">${evrak.aciklama}</p>` : ''}
-                    </div>
-                `;
+                html += formatEvrakCard(evrak, 'var(--primary-color)');
             });
         }
         
         // Diğer Evraklar
         if (evrakData.diger.length > 0) {
-            html += '<h4 style="margin-top: 15px;">📋 Diğer Evraklar</h4>';
+            html += `<h4 style="margin-top: 15px;">📋 Diğer Evraklar (${evrakData.diger.length})</h4>`;
             evrakData.diger.forEach(evrak => {
-                html += `
-                    <div class="evrak-card" style="margin-bottom: 10px; padding: 12px; background: var(--light-bg); border-radius: 6px; border-left: 3px solid var(--text-muted);">
-                        <strong>${evrak.evrakTur || 'Evrak'}</strong>
-                        <p style="margin: 5px 0; font-size: 13px; color: var(--text-secondary);">
-                            ${evrak.evrakTarih || ''} ${evrak.evrakNo ? '- ' + evrak.evrakNo : ''}
-                        </p>
-                        ${evrak.aciklama ? `<p style="margin: 5px 0; font-size: 12px;">${evrak.aciklama}</p>` : ''}
-                    </div>
-                `;
+                html += formatEvrakCard(evrak, 'var(--text-muted)');
             });
         }
         
@@ -458,6 +507,70 @@ window.loadFullEvrakModal = async function(dosyaId) {
         const docsList = document.getElementById('docsList');
         docsList.innerHTML = `<p class="text-center" style="color: var(--danger-color);">Hata: ${error.message}</p>`;
         showToast('Evraklar yüklenemedi: ' + error.message, 'error');
+    }
+};
+
+// Download single evrak
+window.downloadEvrak = async function(evrakId, evrakNo, dosyaId) {
+    try {
+        showToast('Evrak indiriliyor...', 'info');
+        const result = await uyapApi.downloadEvrak(evrakId, evrakNo, dosyaId);
+        if (result) {
+            showToast('Evrak indirildi!', 'success');
+        } else {
+            showToast('Evrak indirilemedi', 'error');
+        }
+    } catch (error) {
+        console.error('Download error:', error);
+        showToast('Hata: ' + error.message, 'error');
+    }
+};
+
+// Download all evrak
+window.downloadAllEvrak = async function(dosyaId) {
+    try {
+        const evrakData = await uyapApi.getAllEvrak(dosyaId);
+        const allEvrak = evrakData.all;
+        
+        if (allEvrak.length === 0) {
+            showToast('İndirilecek evrak bulunamadı', 'warning');
+            return;
+        }
+        
+        showToast(`${allEvrak.length} evrak indiriliyor...`, 'info');
+        
+        let successCount = 0;
+        let failCount = 0;
+        
+        for (let i = 0; i < allEvrak.length; i++) {
+            const evrak = allEvrak[i];
+            const evrakId = evrak.evrakId || evrak.id;
+            const evrakNo = evrak.evrakNo || evrak.birimEvrakNo;
+            
+            if (evrakId) {
+                try {
+                    const result = await uyapApi.downloadEvrak(evrakId, evrakNo, dosyaId);
+                    if (result) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                    }
+                } catch (e) {
+                    failCount++;
+                }
+                
+                // Her 5 evrakta bir progress göster
+                if ((i + 1) % 5 === 0 || i === allEvrak.length - 1) {
+                    showToast(`İndiriliyor: ${i + 1}/${allEvrak.length}`, 'info');
+                }
+            }
+        }
+        
+        showToast(`Tamamlandı! Başarılı: ${successCount}, Başarısız: ${failCount}`, 'success');
+        
+    } catch (error) {
+        console.error('Bulk download error:', error);
+        showToast('Toplu indirme hatası: ' + error.message, 'error');
     }
 };
 

@@ -1899,6 +1899,39 @@ class UYAPApi {
 
         return await this._fetchBlob(endpoint, payload, session);
     }
+
+    /**
+     * Download evrak and trigger browser download
+     */
+    async downloadEvrak(evrakId, evrakNo, dosyaId) {
+        try {
+            const blob = await this.downloadDocument({
+                evrakId: evrakId,
+                dosyaId: dosyaId
+            });
+            
+            if (!blob) {
+                throw new Error('Evrak indirilemedi');
+            }
+
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            // Filename: evrakNo or evrakId + .pdf
+            a.download = `${evrakNo || evrakId || 'evrak'}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            return true;
+        } catch (error) {
+            console.error('downloadEvrak error:', error);
+            throw error;
+        }
+    }
 }
 
 // Export
