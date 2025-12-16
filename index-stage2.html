@@ -54,6 +54,13 @@
 
                 <!-- Dosyalar Tab -->
                 <div class="tab-content active" id="tab-dosyalar">
+                    <div class="tab-header">
+                        <h2>📂 Dosyalarım</h2>
+                        <div class="header-actions">
+                            <span id="cacheStatus" class="cache-status"></span>
+                        </div>
+                    </div>
+
                     <div class="search-container">
                         <input type="text" id="simpleSearchInput" placeholder="Dosya No..." class="search-input">
                         <button id="simpleSearchBtn" class="btn-primary">Ara</button>
@@ -71,6 +78,7 @@
                         <div class="progress-bar">
                             <div id="bulkBar" class="progress-fill"></div>
                         </div>
+                        <div class="progress-status" id="bulkStatus"></div>
                     </div>
 
                     <div id="file-list" class="content-list"></div>
@@ -265,7 +273,6 @@
         <div id="toastContainer"></div>
     </div>
 
-    <script src="db.js"></script>
     <script src="uyap-api.js"></script>
     <script src="uyap-downloader.js"></script>
     <script src="app-stage2.js"></script>

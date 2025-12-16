@@ -122,6 +122,7 @@ try {
 
 let mainWindow;
 let view; // Global view variable
+let viewVisible = true; // Track BrowserView visibility state for performance
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -135,8 +136,8 @@ function createWindow() {
 
     mainWindow.loadFile('index.html');
 
-    // Ana pencerenin DevTools'unu aç
-    mainWindow.webContents.openDevTools();
+    // Ana pencerenin DevTools'unu aç (geliştirme için)
+    // mainWindow.webContents.openDevTools();
 
     // BrowserView ile UYAP'ı yükle
     view = new BrowserView({
@@ -149,9 +150,30 @@ function createWindow() {
 
     mainWindow.setBrowserView(view);
 
-    // View Boyutlarını Ayarla (Sidebar 300px, Header ~60px)
-    // index.html'deki CSS'e göre ayarlıyoruz
-    mainWindow.setBrowserView(view);
+    // View Boyutlarını Dinamik Ayarla (Sidebar 300px, Header 48px)
+    function updateViewBounds() {
+        const { width, height } = mainWindow.getContentBounds();
+        const HEADER_HEIGHT = 48;  // Compact header
+        const SIDEBAR_WIDTH = 300; // Fixed sidebar
+        
+        view.setBounds({
+            x: SIDEBAR_WIDTH,
+            y: HEADER_HEIGHT,
+            width: Math.max(width - SIDEBAR_WIDTH, 0),
+            height: Math.max(height - HEADER_HEIGHT, 0)
+        });
+    }
+    
+    // Initial bounds calculation
+    updateViewBounds();
+    
+    // Update on window state changes
+    mainWindow.on('resize', updateViewBounds);
+    mainWindow.on('maximize', updateViewBounds);
+    mainWindow.on('unmaximize', updateViewBounds);
+    
+    // Load UYAP
+    view.webContents.loadURL('https://uyap.gov.tr');
 
     // Automation Handler
     ipcMain.on('start-automation', () => {
@@ -179,12 +201,15 @@ function createWindow() {
     function updateViewBounds() {
         const [cw, ch] = mainWindow.getContentSize();
         // Sidebar: 300px width
-        // Header (~60px) + Status Bar (~40px) = ~100px top offset
-        // We must ensure it doesn't cover the sidebar
-        view.setBounds({ x: 300, y: 100, width: cw - 300, height: ch - 100 });
+        // Header: 48px (compact)
+        // Total top offset: 48px
+        view.setBounds({ x: 300, y: 48, width: Math.max(cw - 300, 0), height: Math.max(ch - 48, 0) });
     }
 
     updateViewBounds();
+    mainWindow.on('resize', updateViewBounds);
+    mainWindow.on('maximize', updateViewBounds);
+    mainWindow.on('unmaximize', updateViewBounds);
     view.setAutoResize({ width: true, height: true });
 
     // UYAP'ı yükle
@@ -206,16 +231,18 @@ function createWindow() {
 
     // View Visibility Handlers (Fix for Modal Overlay)
     ipcMain.on('hide-view', () => {
-        if (mainWindow) {
+        if (mainWindow && viewVisible) {
             mainWindow.setBrowserView(null);
+            viewVisible = false;
             console.log('🙈 BrowserView hidden (Modal open)');
         }
     });
 
     ipcMain.on('show-view', () => {
-        if (mainWindow && view) {
+        if (mainWindow && view && !viewVisible) {
             mainWindow.setBrowserView(view);
             updateViewBounds(); // Restore correct size/position
+            viewVisible = true;
             console.log('👁️ BrowserView restored');
         }
     });
@@ -275,5 +302,118 @@ ipcMain.on('uyap-files-relay', (event, packet) => {
 ipcMain.on('uyap-debug-data', (event, data) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('uyap-debug-data', data);
+    }
+});
+
+// ============================================================================
+// NOTE OPERATIONS (Stage 2)
+// ============================================================================
+
+// Simple in-memory storage for Stage 2 demo
+// In production, this should use the database (db.js)
+let notesStore = [];
+
+ipcMain.handle('get-all-notes', async () => {
+    console.log('📝 Tüm notlar istendi, döndürülüyor:', notesStore.length);
+    return notesStore;
+});
+
+ipcMain.handle('save-note', async (event, { kaynakId, noteText, noteType }) => {
+    const note = {
+        id: Date.now().toString(),
+        kaynakId: kaynakId,
+        icerik: noteText,
+        type: noteType || 'genel',
+        tarih: new Date().toISOString(),
+        kullanici: 'current-user'
+    };
+    
+    notesStore.push(note);
+    console.log('✅ Not kaydedildi:', note.id);
+    
+    return { success: true, note };
+});
+
+ipcMain.handle('get-notes', async (event, { kaynakId, noteType, limit }) => {
+    let filtered = notesStore;
+    
+    if (kaynakId) {
+        filtered = filtered.filter(n => n.kaynakId === kaynakId);
+    }
+    
+    if (noteType) {
+        filtered = filtered.filter(n => n.type === noteType);
+    }
+    
+    if (limit) {
+        filtered = filtered.slice(0, limit);
+    }
+    
+    console.log(`📝 ${filtered.length} not döndürüldü`);
+    return filtered;
+});
+
+ipcMain.handle('delete-note', async (event, noteId) => {
+    const index = notesStore.findIndex(n => n.id === noteId);
+    if (index !== -1) {
+        notesStore.splice(index, 1);
+        console.log('✅ Not silindi:', noteId);
+        return { success: true };
+    }
+    
+    console.warn('⚠️ Not bulunamadı:', noteId);
+    return { error: 'Not bulunamadı' };
+});
+
+// Google Authorization Handler
+ipcMain.on('google-authorize', () => {
+    console.log('🔐 Google yetkilendirme istendi');
+    // TODO: Implement OAuth flow
+    // For now, show a dialog
+    const { dialog } = require('electron');
+    dialog.showMessageBox({
+        type: 'info',
+        title: 'Google Yetkilendirme',
+        message: 'Google OAuth akışı henüz implement edilmemiştir.\n\nBu özellik için Google Cloud Console\'da OAuth 2.0 kimlik bilgileri oluşturmanız gerekir.'
+    });
+});
+
+// PTT Status Check Handler (Stage 3)
+ipcMain.handle('check-ptt-status', async (event, { barkodNo }) => {
+    console.log(`📮 PTT durumu kontrol ediliyor: ${barkodNo}`);
+    
+    // Simulate PTT API call (in production, this would call actual PTT Kargo API)
+    // PTT Kargo API documentation: https://gonderitakip.ptt.gov.tr/
+    
+    try {
+        // Simulated response - in production, use actual PTT API
+        // Example: const response = await axios.get(`https://gonderitakip.ptt.gov.tr/Track/Quicktrack?q=${barkodNo}`);
+        
+        // For now, return a simulated successful response
+        const mockStatuses = [
+            { id: 2, durum: 'TESLİM EDİLDİ', teslimTarihi: new Date().toISOString() },
+            { id: 1, durum: 'TESLİM EDİLEMEDİ', aciklama: 'Adres bulunamadı' },
+            { id: 0, durum: 'DAĞITIMDA', aciklama: 'Şubede' }
+        ];
+        
+        const randomStatus = mockStatuses[Math.floor(Math.random() * mockStatuses.length)];
+        
+        console.log(`✅ PTT durumu: ${randomStatus.durum}`);
+        
+        return {
+            isLastState: randomStatus.id,
+            durum: randomStatus.durum,
+            lastStateTarihi: randomStatus.teslimTarihi || new Date().toISOString(),
+            aciklama: randomStatus.aciklama || '',
+            barkodNo: barkodNo
+        };
+        
+    } catch (error) {
+        console.error('PTT kontrol hatası:', error);
+        return {
+            error: 'PTT servisine bağlanılamadı',
+            durum: 'KONTROL EDİLEMEDİ',
+            barkodNo: barkodNo
+        };
     }
 });
